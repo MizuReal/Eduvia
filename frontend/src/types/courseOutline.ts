@@ -18,6 +18,8 @@ export type CourseTopic = {
   updatedAt: string
 }
 
+export type CourseTopicSummary = Omit<CourseTopic, 'lessons'>
+
 export type CourseOutline = Course & {
   topics: CourseTopic[]
 }
@@ -29,4 +31,34 @@ export type CreateTopicInput = {
 export type CreateLessonInput = {
   topicId: string
   title: string
+}
+
+export type UpdateTopicInput = {
+  title: string
+}
+
+export type UpdateLessonInput = {
+  title?: string
+  topicId?: string
+}
+
+export type DeletedTopic = {
+  id: string
+  title: string
+  deletedAt: string
+  lessonCount: number
+}
+
+export type DeletedLesson = {
+  id: string
+  title: string
+  topicId: string
+  topicTitle: string
+  deletedAt: string
+  restorable: boolean
+}
+
+export type CourseTrash = {
+  topics: DeletedTopic[]
+  lessons: DeletedLesson[]
 }

@@ -1,19 +1,32 @@
-import { ArrowLeft, CircleAlert, RefreshCw } from 'lucide-react'
+import { arrayMove } from '@dnd-kit/sortable'
+import { ArrowLeft, CheckCircle2, CircleAlert, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
+import { ConfirmDeleteDialog } from '../components/teacher/ConfirmDeleteDialog'
+import { EditLessonDialog } from '../components/teacher/EditLessonDialog'
+import { EditTopicDialog } from '../components/teacher/EditTopicDialog'
 import { LessonForm } from '../components/teacher/LessonForm'
 import { TableOfContents } from '../components/teacher/TableOfContents'
 import { TeacherAccessGate } from '../components/teacher/TeacherAccessGate'
 import { TopicForm } from '../components/teacher/TopicForm'
+import { TrashPanel } from '../components/teacher/TrashPanel'
+import type { RestoredItem } from '../components/teacher/TrashPanel'
 import { Button } from '../components/ui/Button'
 import { courseTermLabel, yearLevelLabel } from '../config/course'
 import { useAuth } from '../context/AuthContext'
+import { FormAlert } from '../components/auth/FormAlert'
 import { ApiError } from '../services/apiClient'
 import {
   createLesson,
   createTopic,
+  deleteLesson,
+  deleteTopic,
   getCourseOutline,
+  reorderLessons,
+  reorderTopics,
+  updateLesson,
+  updateTopic,
 } from '../services/courseOutlineService'
 import type { AuthMode } from '../types/auth'
 import type {
@@ -22,11 +35,18 @@ import type {
   CreateLessonInput,
   CreateTopicInput,
   Lesson,
+  UpdateLessonInput,
 } from '../types/courseOutline'
 
 type CourseOutlinePageProps = {
   onOpenAuth: (mode: AuthMode) => void
 }
+
+type EditTarget =
+  | { kind: 'topic'; topic: CourseTopic }
+  | { kind: 'lesson'; topicId: string; lesson: Lesson }
+
+type DeleteTarget = EditTarget
 
 function OutlineSkeleton() {
   return (
@@ -89,12 +109,17 @@ function OutlineError({
 
 export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
   const { courseId } = useParams<{ courseId: string }>()
+  const navigate = useNavigate()
   const { session } = useAuth()
   const [outline, setOutline] = useState<CourseOutline | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const accessToken = session?.access_token
 
   useEffect(() => {
@@ -193,8 +218,301 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
     [accessToken, courseId],
   )
 
+  const handleReorderTopics = (topicIds: string[]) => {
+    if (!courseId || !accessToken || !outline) {
+      return
+    }
+
+    const previousTopics = outline.topics
+    const topicsById = new Map(previousTopics.map((topic) => [topic.id, topic]))
+    const nextTopics = topicIds
+      .map((topicId) => topicsById.get(topicId))
+      .filter((topic): topic is CourseTopic => Boolean(topic))
+
+    if (nextTopics.length !== previousTopics.length) {
+      return
+    }
+
+    setActionError(null)
+    setActionMessage(null)
+    setOutline((current) =>
+      current ? { ...current, topics: nextTopics } : current,
+    )
+
+    void reorderTopics(courseId, topicIds, accessToken).catch(() => {
+      setOutline((current) =>
+        current ? { ...current, topics: previousTopics } : current,
+      )
+      setActionError('We could not reorder the topics. Try again.')
+    })
+  }
+
+  const handleMoveTopic = (topic: CourseTopic, offset: number) => {
+    if (!outline) {
+      return
+    }
+
+    const index = outline.topics.findIndex((item) => item.id === topic.id)
+    const nextIndex = index + offset
+
+    if (index < 0 || nextIndex < 0 || nextIndex >= outline.topics.length) {
+      return
+    }
+
+    handleReorderTopics(
+      arrayMove(outline.topics, index, nextIndex).map((item) => item.id),
+    )
+  }
+
+  const handleReorderLessons = (topicId: string, lessonIds: string[]) => {
+    if (!courseId || !accessToken || !outline) {
+      return
+    }
+
+    const topic = outline.topics.find((item) => item.id === topicId)
+
+    if (!topic) {
+      return
+    }
+
+    const previousLessons = topic.lessons
+    const lessonsById = new Map(
+      previousLessons.map((lesson) => [lesson.id, lesson]),
+    )
+    const nextLessons = lessonIds
+      .map((lessonId) => lessonsById.get(lessonId))
+      .filter((lesson): lesson is Lesson => Boolean(lesson))
+
+    if (nextLessons.length !== previousLessons.length) {
+      return
+    }
+
+    setActionError(null)
+    setActionMessage(null)
+    setOutline((current) =>
+      current
+        ? {
+            ...current,
+            topics: current.topics.map((item) =>
+              item.id === topicId ? { ...item, lessons: nextLessons } : item,
+            ),
+          }
+        : current,
+    )
+
+    void reorderLessons(topicId, lessonIds, accessToken).catch(() => {
+      setOutline((current) =>
+        current
+          ? {
+              ...current,
+              topics: current.topics.map((item) =>
+                item.id === topicId
+                  ? { ...item, lessons: previousLessons }
+                  : item,
+              ),
+            }
+          : current,
+      )
+      setActionError('We could not reorder the lessons. Try again.')
+    })
+  }
+
+  const handleMoveLesson = (
+    topicId: string,
+    lesson: Lesson,
+    offset: number,
+  ) => {
+    const topic = outline?.topics.find((item) => item.id === topicId)
+
+    if (!topic) {
+      return
+    }
+
+    const index = topic.lessons.findIndex((item) => item.id === lesson.id)
+    const nextIndex = index + offset
+
+    if (index < 0 || nextIndex < 0 || nextIndex >= topic.lessons.length) {
+      return
+    }
+
+    handleReorderLessons(
+      topicId,
+      arrayMove(topic.lessons, index, nextIndex).map((item) => item.id),
+    )
+  }
+
+  const handleUpdateTopic = async (topic: CourseTopic, title: string) => {
+    if (!accessToken) {
+      throw new ApiError(
+        'AUTH_REQUIRED',
+        'Sign in again to update a topic.',
+        401,
+      )
+    }
+
+    const updated = await updateTopic(topic.id, { title }, accessToken)
+
+    setOutline((current) =>
+      current
+        ? {
+            ...current,
+            topics: current.topics.map((item) =>
+              item.id === updated.id ? { ...item, ...updated } : item,
+            ),
+          }
+        : current,
+    )
+    setActionError(null)
+    setActionMessage('Topic updated.')
+  }
+
+  const handleDeleteTopic = async (topic: CourseTopic) => {
+    if (!accessToken) {
+      throw new ApiError(
+        'AUTH_REQUIRED',
+        'Sign in again to delete a topic.',
+        401,
+      )
+    }
+
+    await deleteTopic(topic.id, accessToken)
+
+    setOutline((current) =>
+      current
+        ? {
+            ...current,
+            topics: current.topics.filter((item) => item.id !== topic.id),
+          }
+        : current,
+    )
+    setActionError(null)
+    setActionMessage('Topic deleted. It is now in Deleted items.')
+  }
+
+  const handleUpdateLesson = async (
+    topicId: string,
+    lesson: Lesson,
+    input: UpdateLessonInput,
+  ) => {
+    if (!accessToken) {
+      throw new ApiError(
+        'AUTH_REQUIRED',
+        'Sign in again to update a lesson.',
+        401,
+      )
+    }
+
+    const updated = await updateLesson(lesson.id, input, accessToken)
+
+    setOutline((current) => {
+      if (!current) {
+        return current
+      }
+
+      if (input.topicId === topicId) {
+        return {
+          ...current,
+          topics: current.topics.map((topic) =>
+            topic.id === topicId
+              ? {
+                  ...topic,
+                  lessons: topic.lessons.map((item) =>
+                    item.id === updated.id ? updated : item,
+                  ),
+                }
+              : topic,
+          ),
+        }
+      }
+
+      return {
+        ...current,
+        topics: current.topics.map((topic) => {
+          const withoutLesson = topic.lessons.filter(
+            (item) => item.id !== updated.id,
+          )
+
+          return topic.id === updated.topicId
+            ? { ...topic, lessons: [...withoutLesson, updated] }
+            : { ...topic, lessons: withoutLesson }
+        }),
+      }
+    })
+    setActionError(null)
+    setActionMessage('Lesson updated.')
+  }
+
+  const handleDeleteLesson = async (topicId: string, lesson: Lesson) => {
+    if (!accessToken) {
+      throw new ApiError(
+        'AUTH_REQUIRED',
+        'Sign in again to delete a lesson.',
+        401,
+      )
+    }
+
+    await deleteLesson(lesson.id, accessToken)
+
+    setOutline((current) =>
+      current
+        ? {
+            ...current,
+            topics: current.topics.map((topic) =>
+              topic.id === topicId
+                ? {
+                    ...topic,
+                    lessons: topic.lessons.filter(
+                      (item) => item.id !== lesson.id,
+                    ),
+                  }
+                : topic,
+            ),
+          }
+        : current,
+    )
+    setActionError(null)
+    setActionMessage('Lesson deleted. It is now in Deleted items.')
+  }
+
+  const handleRestored = (item: RestoredItem) => {
+    setOutline((current) => {
+      if (!current) {
+        return current
+      }
+
+      if (item.kind === 'topic') {
+        const exists = current.topics.some(
+          (topic) => topic.id === item.topic.id,
+        )
+
+        return {
+          ...current,
+          topics: exists
+            ? current.topics.map((topic) =>
+                topic.id === item.topic.id ? item.topic : topic,
+              )
+            : [...current.topics, item.topic],
+        }
+      }
+
+      return {
+        ...current,
+        topics: current.topics.map((topic) =>
+          topic.id === item.lesson.topicId
+            ? { ...topic, lessons: [...topic.lessons, item.lesson] }
+            : topic,
+        ),
+      }
+    })
+  }
+
   const handleRetry = () => {
     setReloadKey((key) => key + 1)
+  }
+
+  const clearActionFeedback = () => {
+    setActionError(null)
+    setActionMessage(null)
   }
 
   return (
@@ -244,7 +562,113 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
                   onCreate={handleCreateLesson}
                 />
               </div>
-              <TableOfContents topics={outline.topics} />
+
+              {(actionError || actionMessage) && (
+                <div className="mt-lg">
+                  {actionError ? (
+                    <FormAlert message={actionError} />
+                  ) : (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="flex items-start gap-xs rounded-md border border-accent-green/30 bg-canvas-soft p-sm text-body-sm text-ink"
+                    >
+                      <CheckCircle2
+                        className="mt-xxs size-4 shrink-0 text-accent-green"
+                        aria-hidden="true"
+                      />
+                      <p>{actionMessage}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <TableOfContents
+                topics={outline.topics}
+                onMoveTopic={handleMoveTopic}
+                onEditTopic={(topic) => {
+                  clearActionFeedback()
+                  setEditTarget({ kind: 'topic', topic })
+                }}
+                onDeleteTopic={(topic) => {
+                  clearActionFeedback()
+                  setDeleteTarget({ kind: 'topic', topic })
+                }}
+                onManageContent={(topic) => {
+                  clearActionFeedback()
+
+                  if (courseId) {
+                    navigate(
+                      `/teacher/subjects/${courseId}/topics/${topic.id}`,
+                    )
+                  }
+                }}
+                onMoveLesson={handleMoveLesson}
+                onEditLesson={(topicId, lesson) => {
+                  clearActionFeedback()
+                  setEditTarget({ kind: 'lesson', topicId, lesson })
+                }}
+                onDeleteLesson={(topicId, lesson) => {
+                  clearActionFeedback()
+                  setDeleteTarget({ kind: 'lesson', topicId, lesson })
+                }}
+                onReorderTopics={handleReorderTopics}
+                onReorderLessons={handleReorderLessons}
+              />
+
+              {courseId && accessToken && (
+                <TrashPanel
+                  courseId={courseId}
+                  accessToken={accessToken}
+                  onRestored={handleRestored}
+                />
+              )}
+
+              {editTarget?.kind === 'topic' && (
+                <EditTopicDialog
+                  title={editTarget.topic.title}
+                  onSave={(title) => handleUpdateTopic(editTarget.topic, title)}
+                  onClose={() => setEditTarget(null)}
+                />
+              )}
+
+              {editTarget?.kind === 'lesson' && (
+                <EditLessonDialog
+                  lesson={editTarget.lesson}
+                  topics={outline.topics}
+                  onSave={(input) =>
+                    handleUpdateLesson(
+                      editTarget.topicId,
+                      editTarget.lesson,
+                      input,
+                    )
+                  }
+                  onClose={() => setEditTarget(null)}
+                />
+              )}
+
+              {deleteTarget?.kind === 'topic' && (
+                <ConfirmDeleteDialog
+                  title="Delete topic?"
+                  description={`Delete “${deleteTarget.topic.title}”? Its lessons will also be deleted. You can restore the topic from Deleted items.`}
+                  onConfirm={() => handleDeleteTopic(deleteTarget.topic)}
+                  onClose={() => setDeleteTarget(null)}
+                />
+              )}
+
+              {deleteTarget?.kind === 'lesson' && (
+                <ConfirmDeleteDialog
+                  title="Delete lesson?"
+                  description={`Delete “${deleteTarget.lesson.title}”? You can restore it from Deleted items.`}
+                  onConfirm={() =>
+                    handleDeleteLesson(
+                      deleteTarget.topicId,
+                      deleteTarget.lesson,
+                    )
+                  }
+                  onClose={() => setDeleteTarget(null)}
+                />
+              )}
             </>
           )}
         </TeacherAccessGate>

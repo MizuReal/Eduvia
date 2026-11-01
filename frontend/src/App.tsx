@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthModal } from './components/auth/AuthModal'
 import { SiteFooter } from './components/layout/SiteFooter'
@@ -8,6 +8,26 @@ import { CourseOutlinePage } from './pages/CourseOutlinePage'
 import HomePage from './pages/HomePage'
 import { TeacherPage } from './pages/TeacherPage'
 import type { AuthMode } from './types/auth'
+
+const TopicEditorPage = lazy(() =>
+  import('./pages/TopicEditorPage').then((module) => ({
+    default: module.TopicEditorPage,
+  })),
+)
+
+function EditorRouteFallback() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mx-auto my-xl max-w-5xl px-md"
+    >
+      <div className="h-14 animate-pulse rounded-lg bg-surface motion-reduce:animate-none" />
+      <div className="mt-md h-96 animate-pulse rounded-lg bg-surface motion-reduce:animate-none" />
+      <span className="sr-only">Loading editor</span>
+    </div>
+  )
+}
 
 function AppShell() {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
@@ -39,6 +59,14 @@ function AppShell() {
           <Route
             path="/teacher/subjects/:courseId"
             element={<CourseOutlinePage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/teacher/subjects/:courseId/topics/:topicId"
+            element={
+              <Suspense fallback={<EditorRouteFallback />}>
+                <TopicEditorPage onOpenAuth={openAuth} />
+              </Suspense>
+            }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

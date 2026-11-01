@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { config } from 'dotenv'
 import { z } from 'zod'
 
@@ -43,6 +45,46 @@ const envSchema = z.object({
     .transform((value) => value.replace(/\/+$/, '')),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required.'),
   SUPABASE_JWT_SECRET: optionalJwtSecret,
+  UPLOAD_TEMP_DIR: z.string().min(1).default(join(tmpdir(), 'eduvia-uploads')),
+  DOCUMENT_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100 * 1024 * 1024)
+    .default(25 * 1024 * 1024),
+  IMAGE_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(25 * 1024 * 1024)
+    .default(10 * 1024 * 1024),
+  IMAGE_MAX_PIXELS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100_000_000)
+    .default(40_000_000),
+  USER_STORAGE_QUOTA_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(250 * 1024 * 1024),
+  SIGNED_URL_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(30)
+    .max(3600)
+    .default(300),
+  UPLOAD_RATE_LIMIT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60 * 1000),
+  UPLOAD_RATE_LIMIT_MAX: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30),
 })
 
 const parsed = envSchema.safeParse(process.env)

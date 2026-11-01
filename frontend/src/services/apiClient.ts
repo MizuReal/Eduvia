@@ -1,5 +1,5 @@
 const configuredApiUrl = import.meta.env.VITE_API_URL
-const API_BASE_URL =
+export const API_BASE_URL =
   typeof configuredApiUrl === 'string'
     ? configuredApiUrl.replace(/\/+$/, '')
     : ''
@@ -78,6 +78,27 @@ function isApiSuccess<T>(payload: unknown): payload is ApiSuccess<T> {
   return 'data' in record && record.error === null
 }
 
+export function parseApiResponse<T>(payload: unknown, status: number): T {
+  if (isApiFailure(payload)) {
+    throw new ApiError(
+      payload.error.code,
+      payload.error.message,
+      status,
+      payload.error.details,
+    )
+  }
+
+  if (status < 200 || status >= 300) {
+    throw new ApiError('HTTP_ERROR', 'Something went wrong.', status)
+  }
+
+  if (!isApiSuccess<T>(payload)) {
+    throw new ApiError('INVALID_RESPONSE', 'Something went wrong.', status)
+  }
+
+  return payload.data
+}
+
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -93,28 +114,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     })
     const payload: unknown = await response.json()
 
-    if (isApiFailure(payload)) {
-      throw new ApiError(
-        payload.error.code,
-        payload.error.message,
-        response.status,
-        payload.error.details,
-      )
-    }
-
-    if (!response.ok) {
-      throw new ApiError('HTTP_ERROR', 'Something went wrong.', response.status)
-    }
-
-    if (!isApiSuccess<T>(payload)) {
-      throw new ApiError(
-        'INVALID_RESPONSE',
-        'Something went wrong.',
-        response.status,
-      )
-    }
-
-    return payload.data
+    return parseApiResponse<T>(payload, response.status)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -152,6 +152,43 @@ export function postAuth<T>(
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
+  })
+}
+
+export function patchAuth<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+export function putAuth<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAuth<T>(path: string, accessToken: string): Promise<T> {
+  return request<T>(path, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   })
 }
 

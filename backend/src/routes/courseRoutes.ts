@@ -3,6 +3,8 @@ import {
   createLessonHandler,
   createTopicHandler,
   getCourseOutlineHandler,
+  getTrashHandler,
+  reorderTopicsHandler,
 } from '../controllers/courseOutlineController.js'
 import {
   createCourseHandler,
@@ -18,5 +20,7 @@ courseRouter.use(requireAuth, requireRole('instructor'))
 courseRouter.get('/', listCoursesHandler)
 courseRouter.post('/', createCourseHandler)
 courseRouter.get('/:courseId', getCourseOutlineHandler)
+courseRouter.get('/:courseId/trash', getTrashHandler)
+courseRouter.patch('/:courseId/topics/reorder', reorderTopicsHandler)
 courseRouter.post('/:courseId/topics', createTopicHandler)
 courseRouter.post('/:courseId/lessons', createLessonHandler)

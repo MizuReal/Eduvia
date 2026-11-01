@@ -26,16 +26,30 @@ const {
 vi.mock('../src/db/courses.js', () => ({
   findCourseForInstructor: findCourseForInstructorMock,
   insertCourse: vi.fn(),
+  listCourseCodesForScope: vi.fn(),
   listCoursesByInstructor: vi.fn(),
 }))
 
 vi.mock('../src/db/courseOutline.js', () => ({
+  findDeletedLessonForInstructor: vi.fn(),
+  findDeletedTopicForInstructor: vi.fn(),
+  findLessonForInstructor: vi.fn(),
   findTopicForCourse: findTopicForCourseMock,
+  findTopicForInstructor: vi.fn(),
+  getCourseTrash: vi.fn(),
   getNextLessonOrderIndex: getNextLessonOrderIndexMock,
   getNextTopicOrderIndex: getNextTopicOrderIndexMock,
   insertLesson: insertLessonMock,
   insertTopic: insertTopicMock,
   listTopicsAndLessons: listTopicsAndLessonsMock,
+  reorderCourseTopics: vi.fn(),
+  reorderTopicLessons: vi.fn(),
+  restoreLesson: vi.fn(),
+  restoreTopic: vi.fn(),
+  softDeleteLesson: vi.fn(),
+  softDeleteTopic: vi.fn(),
+  updateLessonRecord: vi.fn(),
+  updateTopicTitle: vi.fn(),
 }))
 
 vi.mock('../src/db/profiles.js', () => ({

@@ -12,7 +12,7 @@ async function verifyDatabase(): Promise<void> {
         supabaseAdmin.from('profiles').select('id').limit(1),
         supabaseAdmin.from('courses').select('id').limit(1),
         supabaseAdmin.from('course_topics').select('id').limit(1),
-        supabaseAdmin.from('lessons').select('id').limit(1),
+        supabaseAdmin.from('lessons').select('id, deleted_batch_id').limit(1),
       ])
 
     if (profilesCheck.error) {
@@ -29,10 +29,17 @@ async function verifyDatabase(): Promise<void> {
       )
     }
 
-    if (courseTopicsCheck.error || lessonsCheck.error) {
+    if (courseTopicsCheck.error) {
       logger.error(
-        { err: courseTopicsCheck.error ?? lessonsCheck.error },
+        { err: courseTopicsCheck.error },
         'Database check failed. Apply schemas/003_outline.sql to the Supabase project.',
+      )
+    }
+
+    if (lessonsCheck.error) {
+      logger.error(
+        { err: lessonsCheck.error },
+        'Database check failed. Apply schemas/003_outline.sql and schemas/004_outline_management.sql to the Supabase project.',
       )
     }
 

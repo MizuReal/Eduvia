@@ -435,6 +435,27 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 **`text-input`** — Text / number field
 - White surface `{colors.surface}`, `{colors.ink}` text, `{typography.body-sm}`, 1px `rgb(221,221,221)` border, rounded `{rounded.xs}` (4px), padding `6px`. Square-ish corners deliberately tighter than the pill CTAs. Focus adds the soft Level-1 shadow.
 
+### Content authoring
+
+**`content-editor`** — Tiptap doc and slide editing surface
+- White `{colors.surface}` shell with a `{colors.hairline}` border, `{rounded.lg}` corners, and the Level-1 soft shadow. Toolbar sits on the same surface above the editable region.
+- Document body uses `{typography.body-md}` with a 65–75 character reading measure. Slide bodies use `{typography.title}` for body copy and the heading scale for slide titles.
+
+**`content-toolbar`** — Formatting controls
+- A wrapping row of 44px icon buttons on `{colors.surface}`, divided by `{colors.hairline}` rules. Idle icons use `{colors.ink-muted}`; active marks use `{colors.ink}` on `{colors.canvas-soft}`. Focus uses the standard primary outline.
+
+**`content-tab`** — PPTX / Docs / Upload navigation
+- Link-based tabs with `{typography.body-sm}` and a 2px active underline in `{colors.primary}`. Inactive labels use `{colors.ink-muted}`. Counts use `{typography.caption}`.
+
+**`slide-rail`** — Ordered slide list
+- White `{colors.surface}` panel with `{colors.hairline}` border and `{rounded.lg}` corners. The active row uses `{colors.canvas-soft}` with a `{colors.primary}` border. Every row keeps a 44px control height.
+
+**`slide-canvas`** — Slide editing and preview surface
+- White `{colors.surface}` with a `{colors.hairline}` border, `{rounded.lg}` corners, and the Level-1 soft shadow. Preview mode uses a 16:9 frame; editing mode keeps a comfortable minimum height and stacks above the rail on mobile.
+
+**`asset-card`** — Embedded image / file node
+- Images sit in a `{rounded.lg}` frame with a `{colors.hairline}` border. File attachments use a white card with a `{colors.canvas-soft}` icon well, `{typography.body-sm}` name, `{typography.caption}` metadata, and a utility open action. Unavailable assets show an icon plus explanatory text and a retry action.
+
 ### Signature Components
 
 **`hero-band`** — Dark "night" hero

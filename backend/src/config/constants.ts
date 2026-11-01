@@ -29,3 +29,43 @@ export const MAX_GENERATED_CODE_ATTEMPTS = 20
 export const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 export const AUTH_RATE_LIMIT_MAX = 10
 export const JSON_BODY_LIMIT = '1mb'
+
+export const COURSE_FILES_BUCKET = 'course-files'
+export const UPLOAD_FIELD_NAME = 'file'
+
+export const PRESENTATION_EXTENSIONS = ['.pptx', '.pdf'] as const
+export const PRESENTATION_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+] as const
+
+export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
+export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
+export const DOCUMENT_EXTENSIONS = [
+  '.pdf',
+  '.docx',
+  '.pptx',
+  '.txt',
+  '.md',
+] as const
+export const DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/markdown',
+] as const
+
+export const CONTENT_TITLE_MIN_LENGTH = 2
+export const CONTENT_TITLE_MAX_LENGTH = 160
+export const PRESENTATION_SUMMARY_MIN_LENGTH = 20
+export const PRESENTATION_SUMMARY_MAX_LENGTH = 1000
+export const CONTENT_JSON_MAX_BYTES = 512 * 1024
+export const CONTENT_MAX_ASSETS = 50
+export const SLIDES_DOCUMENT_VERSION = 1
+export const SLIDES_MAX_SLIDES = 80
+export const TIPTAP_MAX_NODES = 20_000
+export const TIPTAP_MAX_DEPTH = 50
+export const TIPTAP_MAX_TEXT_LENGTH = 100_000
+export const IMAGE_MAX_DIMENSION = 10_000

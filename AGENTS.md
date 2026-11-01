@@ -14,7 +14,8 @@ and content. Web-only — there is no mobile client and no media transcoding pip
 ## Stack
 
 - **Frontend** — React 19, Vite 8, Tailwind CSS v4 (`@tailwindcss/vite`), React Router 6,
-  react-hook-form + Zod, Tiptap 3, react-dropzone, Vitest + React Testing Library.
+  react-hook-form + Zod, Tiptap 3, react-dropzone, `@dnd-kit` sortable controls,
+  Vitest + React Testing Library.
 - **Backend** — Node.js ESM, Express 5, strict TypeScript (NodeNext), Zod 4, Supabase JS,
   jose, pino, helmet, multer, file-type, mammoth, sharp, yauzl, sanitize-html, Vitest + Supertest.
 - **Data** — Supabase Postgres, Auth, and Storage. Schema lives in `schemas/`.
@@ -36,6 +37,7 @@ DESIGN.md                Design system — single source of truth for all UI
 docs/SPEC.md             Product contract — API, files/uploads, quizzes, database + RLS
 frontend/src/services/   API + Supabase auth wrappers (only place Supabase is called)
 frontend/src/context/    AuthContext provider
+frontend/src/components/content/  Tiptap editor, slide rail, asset node views
 frontend/src/{pages,components,types,config,schemas}/
 frontend/src/test/       Vitest setup and shared doubles
 frontend/src/__tests__/  Vitest suites
@@ -43,6 +45,7 @@ backend/src/app.ts       createApp() factory
 backend/src/server.ts    HTTP listener and graceful shutdown
 backend/src/routes/      Feature routers
 backend/src/{controllers,services,schemas,middleware,db,config,errors,lib,types,utils}/
+backend/src/storage/     Supabase Storage adapters
 backend/tests/           Supertest API and integration tests
 backend/src/test/        Env setup and token fixtures
 ```
@@ -116,6 +119,10 @@ These are stated once, here. Every other section assumes them.
   WebVTT captions. No custom streaming UI.
 - Rich text: the shared Tiptap editor and renderer, storing Tiptap JSON. Never pass unsanitized
   HTML to `dangerouslySetInnerHTML`.
+- Topic content: the slides editor and docs editor use the shared Tiptap editor/renderer.
+  Images and embedded files are custom nodes that store only file ids; resolve them through
+  signed URLs. Uploads use the shared progress, cancel, retry, processing, ready, and failed
+  states.
 - Quiz runner: autosave answers, support resume, show time remaining, confirm before submitting,
   never reveal answers before submission.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
@@ -158,6 +165,10 @@ These are stated once, here. Every other section assumes them.
   from `AUTH_RATE_LIMIT_*` on auth-adjacent, upload, quiz-start, and quiz-submit endpoints.
 - Uploads: `multer` disk storage in a dedicated temp directory with hard size limits, streamed to
   Supabase Storage, temp files deleted in `finally`. Never buffer a large video in memory.
+- File validation: extension allowlist, size, magic bytes with `file-type`, image decode and
+  re-encode with `sharp`, SHA-256 checksum, per-user quota, and short-lived signed URLs.
+- Topic content: validate Tiptap JSON against the server allowlist before persistence, and
+  validate every embedded file reference against its owning content item.
 - All third-party calls originate here. No server-side fetching of user-supplied URLs (no SSRF).
 - Write admin actions, role changes, publishes, unpublishes, and content removals to `audit_logs`.
 
@@ -189,8 +200,17 @@ These are stated once, here. Every other section assumes them.
 - Courses contain ordered topics; topics contain ordered lessons. The table of contents is the
   ordered projection of those rows — there is no separate table-of-contents table.
 - Topics and lessons are ordered; reordering happens in one transaction and preserves a
-  contiguous `order_index`.
+  contiguous `order_index`. Moving a lesson to another topic appends it to that topic.
+- Deleting a topic soft-deletes its lessons as one batch. Restoring the topic restores that
+  batch; individually deleted lessons remain in the trash. Restored topics and lessons append.
 - Lesson blocks have explicit types: `text`, `image`, `file`, `video`, `quiz`.
+- Topic content is a singleton workspace per topic: one Tiptap slides document, one Tiptap
+  document, and one uploaded presentation. The editor opens directly on the PPTX tab; Docs and
+  Upload are the other two tabs.
+- The slides editor stores a versioned list of slides, each a Tiptap document. Docs and slides
+  store embedded image/file references as file ids, never signed URLs or base64 data.
+- Uploaded presentations keep the original file and a required summary. Replacing an upload
+  creates a new file record and soft-deletes the previous file once the new file is ready.
 - Course text is stored as Tiptap JSON and rendered through the shared renderer or converted to
   sanitized HTML server-side. Raw client HTML is never rendered.
 - Students self-enroll only in published courses; enrollment is idempotent. Instructors and
@@ -219,10 +239,12 @@ These are stated once, here. Every other section assumes them.
 
 - Frontend: Vitest + React Testing Library in jsdom. Suites live in `frontend/src/__tests__/`;
   setup and shared doubles in `frontend/src/test/`. Cover role-aware routing, form validation,
-  upload states, quiz runner timer and resume behavior, and accessibility-critical interactions.
+  upload states, slides editing, embedded image/file rendering, quiz runner timer and resume
+  behavior, and accessibility-critical interactions.
 - Backend: Vitest + Supertest. Suites live in `backend/tests/*.test.ts`; env setup and fixtures in
-  `backend/src/test/`. Cover auth middleware, role authorization, Zod validation, quiz grading,
-  attempt snapshots, file validation, signed URL issuance, and soft-delete behavior.
+  `backend/src/test/`. Cover auth middleware, role authorization, Zod validation, Tiptap content
+  validation, embedded-file ownership, image/document validation, signed URL issuance, quiz
+  grading, attempt snapshots, and soft-delete behavior.
 - Tests never touch a real Supabase project, storage, or the network. Mock
   `services/supabaseClient.ts`, `db/supabaseAdmin.ts`, storage calls, and `fetch`. Values come
   from committed `frontend/.env.test` and `backend/.env.test`; tests pass with no `.env` present.
