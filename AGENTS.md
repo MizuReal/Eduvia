@@ -133,7 +133,8 @@ These are stated once, here. Every other section assumes them.
 
 - `app.ts` exports `createApp()` for tests. `server.ts` owns the listener, signal handling, and
   graceful shutdown. Never listen from `app.ts`.
-- Routes are grouped by feature domain in `src/routes/`; no monolithic router.
+- Routes are grouped by feature domain in `src/routes/`; split `routes/index.ts` into per-feature
+  routers as features land rather than letting one router grow monolithic.
 - Controllers are thin: parse with Zod, call a service, return a typed response. Business logic
   lives in `src/services/`.
 - Every request body, query, and route parameter is parsed by a Zod schema in `src/schemas/`

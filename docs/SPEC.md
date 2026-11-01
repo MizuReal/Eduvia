@@ -13,11 +13,13 @@ contract — build them to this spec, not to an approximation of it.
 ## 1. API surface
 
 Every route lives under `/api/`, uses `kebab-case`, and returns the envelope defined in
-`AGENTS.md` §API.
+`AGENTS.md` §API. Routes marked **✓** are shipped today; the rest are the target contract.
 
 ```
-GET    /api/courses
-POST   /api/courses
+POST   /api/auth/register                                    ✓
+GET    /api/users/me                                         ✓
+GET    /api/courses                                          ✓ instructor-only
+POST   /api/courses                                          ✓ instructor-only
 GET    /api/courses/:courseId
 PATCH  /api/courses/:courseId
 POST   /api/courses/:courseId/publish
@@ -53,7 +55,6 @@ PATCH  /api/attempts/:attemptId/answers
 POST   /api/attempts/:attemptId/submit
 POST   /api/attempts/:attemptId/grade
 
-GET    /api/users/me
 GET    /api/admin/users
 PATCH  /api/admin/users/:userId/role
 ```
@@ -228,13 +229,18 @@ through short-lived signed URLs. The backend writes course-scoped paths and reco
 
 ### RLS matrix
 
-| Actor       | Reads                                                              | Writes                                                          |
-| ----------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Anonymous   | Published course metadata (catalog)                                | None                                                            |
-| Student     | Own profile; content and quizzes of published courses they are enrolled in; own enrollments and attempts | Own profile; own in-progress answers; own enrollments and lesson progress |
-| Instructor  | Own courses, lessons, blocks, quizzes, files; enrollments and attempts for their courses | Own courses, lessons, blocks, quizzes, files; enrollment for courses they manage |
-| Admin       | All rows and all storage objects                                   | All rows and all storage objects                                |
+- **Anonymous** — reads published course metadata (catalog); writes nothing.
+- **Student** — reads own profile, content and quizzes of published courses they are enrolled in,
+  own enrollments, own attempts and lesson progress; writes own profile, own in-progress answers,
+  own enrollments and lesson progress.
+- **Instructor** — reads and writes own courses, lessons, blocks, quizzes, files; reads the
+  enrollments and attempts for their courses; writes enrollment for courses they manage.
+- **Admin** — reads and writes all rows and all storage objects.
 
 Draft and archived courses are visible only to their owner and admins. Policies use `auth.uid()`
 and a trusted role helper — never a role claim supplied or editable by the client. Storage
 policies mirror table policies: owners, enrolled students, and admins only.
+
+Shipped behavior is currently narrower than this matrix: `GET /api/courses` sits behind
+`requireAuth` + `requireRole('instructor')`. The student and anonymous catalog rows above are
+target behavior, not current behavior.
