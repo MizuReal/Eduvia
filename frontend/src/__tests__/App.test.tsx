@@ -1,11 +1,31 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
 
+const authMocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  getProfile: vi.fn(),
+  onAuthStateChange: vi.fn(),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  register: vi.fn(),
+  usernameToAuthEmail: vi.fn(),
+}))
+
+vi.mock('../services/authService', () => authMocks)
+
+beforeEach(() => {
+  Object.values(authMocks).forEach((mock) => mock.mockReset())
+  authMocks.getSession.mockResolvedValue(null)
+  authMocks.onAuthStateChange.mockReturnValue(() => undefined)
+})
+
 describe('App', () => {
-  it('renders the homepage content', () => {
+  it('renders the homepage content', async () => {
     render(<App />)
+
+    await screen.findByRole('button', { name: 'Sign in' })
 
     expect(
       screen.getByRole('heading', {
@@ -29,6 +49,8 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await screen.findByRole('button', { name: 'Sign in' })
+
     const toggle = screen.getByRole('button', { name: /open menu/i })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
 
@@ -47,5 +69,22 @@ describe('App', () => {
       screen.queryByRole('navigation', { name: /mobile/i }),
     ).not.toBeInTheDocument()
     expect(toggle).toHaveFocus()
+  })
+
+  it('opens the register modal from the header', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const createAccount = await screen.findByRole('button', {
+      name: 'Create account',
+    })
+    await user.click(createAccount)
+
+    const dialog = await screen.findByRole('dialog', {
+      name: /create your eduvia account/i,
+    })
+
+    expect(within(dialog).getByLabelText('Username')).toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: 'Faculty' })).toBeInTheDocument()
   })
 })

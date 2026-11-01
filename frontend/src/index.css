@@ -87,11 +87,19 @@
   --spacing-section: 64px;
   --spacing-section-lg: 96px;
 
+  --container-modal: 28rem;
+
   --shadow-soft:
     rgba(0, 0, 0, 0.01) 0 0.175px 1.041px,
     rgba(0, 0, 0, 0.02) 0 0.8px 2.925px,
     rgba(0, 0, 0, 0.027) 0 2.025px 7.847px,
     rgba(0, 0, 0, 0.04) 0 4px 18px;
+  --shadow-elevated:
+    rgba(0, 0, 0, 0.01) 0 0.175px 1.041px,
+    rgba(0, 0, 0, 0.02) 0 0.8px 2.925px,
+    rgba(0, 0, 0, 0.027) 0 2.025px 7.847px,
+    rgba(0, 0, 0, 0.04) 0 4px 18px,
+    rgba(0, 0, 0, 0.05) 0 23px 52px;
 }
 
 @layer base {
