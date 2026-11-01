@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TeacherPage } from '../pages/TeacherPage'
 import { ApiError } from '../services/apiClient'
@@ -69,11 +70,26 @@ function instructorAuth() {
   }
 }
 
-async function fillSubjectForm() {
+function renderTeacherPage(onOpenAuth = vi.fn()) {
+  return render(
+    <MemoryRouter>
+      <TeacherPage onOpenAuth={onOpenAuth} />
+    </MemoryRouter>,
+  )
+}
+
+async function fillSubjectForm(customCode?: string) {
   const user = userEvent.setup()
 
   await user.type(screen.getByLabelText('Subject name'), 'Web Systems')
-  await user.type(screen.getByLabelText('Subject code'), 'it301')
+
+  if (customCode) {
+    await user.click(screen.getByRole('button', { name: 'Use custom code' }))
+    const codeInput = screen.getByLabelText('Subject code')
+    await user.clear(codeInput)
+    await user.type(codeInput, customCode)
+  }
+
   await user.selectOptions(
     screen.getByLabelText('Trimester'),
     'first_trimester',
@@ -101,7 +117,7 @@ describe('TeacherPage', () => {
       profileError: null,
     }
 
-    render(<TeacherPage onOpenAuth={onOpenAuth} />)
+    renderTeacherPage(onOpenAuth)
 
     expect(
       screen.getByRole('heading', { name: 'Subjects' }),
@@ -129,7 +145,7 @@ describe('TeacherPage', () => {
       },
     }
 
-    render(<TeacherPage onOpenAuth={vi.fn()} />)
+    renderTeacherPage()
 
     expect(
       screen.getByRole('heading', { name: 'Teacher access required' }),
@@ -140,7 +156,7 @@ describe('TeacherPage', () => {
   it('renders an instructor subject list', async () => {
     courseMocks.listCourses.mockResolvedValue([course])
 
-    render(<TeacherPage onOpenAuth={vi.fn()} />)
+    renderTeacherPage()
 
     expect(await screen.findByText('Web Systems')).toBeInTheDocument()
 
@@ -150,17 +166,52 @@ describe('TeacherPage', () => {
     expect(within(subjectList).getByText('3rd Year')).toBeInTheDocument()
   })
 
+  it('previews an automatic subject code from the name', async () => {
+    const user = userEvent.setup()
+    renderTeacherPage()
+
+    await screen.findByText('No subjects yet')
+    await user.type(
+      screen.getByLabelText('Subject name'),
+      'Web Systems and Technologies',
+    )
+
+    expect(screen.getByText('WST')).toBeInTheDocument()
+  })
+
+  it('submits a custom subject code', async () => {
+    courseMocks.createCourse.mockResolvedValue({
+      ...course,
+      code: 'WST101',
+    })
+    renderTeacherPage()
+
+    await screen.findByText('No subjects yet')
+    const user = await fillSubjectForm('WST101')
+    await user.click(screen.getByRole('button', { name: 'Create subject' }))
+
+    expect(
+      await screen.findByText('Subject created with code WST101.'),
+    ).toBeInTheDocument()
+    expect(courseMocks.createCourse).toHaveBeenCalledWith(
+      {
+        name: 'Web Systems',
+        code: 'WST101',
+        term: 'first_trimester',
+        yearLevel: 3,
+      },
+      'test-token',
+    )
+  })
+
   it('validates the form before submitting', async () => {
     const user = userEvent.setup()
-    render(<TeacherPage onOpenAuth={vi.fn()} />)
+    renderTeacherPage()
 
     await screen.findByText('No subjects yet')
     await user.click(screen.getByRole('button', { name: 'Create subject' }))
 
     expect(screen.getByText('Use 3–120 characters.')).toBeInTheDocument()
-    expect(
-      screen.getByText('Use 3–20 letters, numbers, or hyphens.'),
-    ).toBeInTheDocument()
     expect(screen.getByText('Select a trimester.')).toBeInTheDocument()
     expect(screen.getByText('Select a year level.')).toBeInTheDocument()
     expect(courseMocks.createCourse).not.toHaveBeenCalled()
@@ -168,19 +219,18 @@ describe('TeacherPage', () => {
 
   it('creates a subject and adds it to the list', async () => {
     courseMocks.createCourse.mockResolvedValue(course)
-    render(<TeacherPage onOpenAuth={vi.fn()} />)
+    renderTeacherPage()
 
     await screen.findByText('No subjects yet')
     const user = await fillSubjectForm()
     await user.click(screen.getByRole('button', { name: 'Create subject' }))
 
     expect(
-      await screen.findByText('Subject created. It is now in your list.'),
+      await screen.findByText('Subject created with code IT301.'),
     ).toBeInTheDocument()
     expect(courseMocks.createCourse).toHaveBeenCalledWith(
       {
         name: 'Web Systems',
-        code: 'IT301',
         term: 'first_trimester',
         yearLevel: 3,
       },
@@ -197,10 +247,10 @@ describe('TeacherPage', () => {
         409,
       ),
     )
-    render(<TeacherPage onOpenAuth={vi.fn()} />)
+    renderTeacherPage()
 
     await screen.findByText('No subjects yet')
-    const user = await fillSubjectForm()
+    const user = await fillSubjectForm('IT301')
     await user.click(screen.getByRole('button', { name: 'Create subject' }))
 
     expect(

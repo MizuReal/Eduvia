@@ -4,15 +4,21 @@ import { createApp } from '../src/app.js'
 import { AppError } from '../src/errors/AppError.js'
 import { signTestToken } from '../src/test/authToken.js'
 
-const { findProfileByIdMock, insertCourseMock, listCoursesByInstructorMock } =
-  vi.hoisted(() => ({
-    findProfileByIdMock: vi.fn(),
-    insertCourseMock: vi.fn(),
-    listCoursesByInstructorMock: vi.fn(),
-  }))
+const {
+  findProfileByIdMock,
+  insertCourseMock,
+  listCourseCodesForScopeMock,
+  listCoursesByInstructorMock,
+} = vi.hoisted(() => ({
+  findProfileByIdMock: vi.fn(),
+  insertCourseMock: vi.fn(),
+  listCourseCodesForScopeMock: vi.fn(),
+  listCoursesByInstructorMock: vi.fn(),
+}))
 
 vi.mock('../src/db/courses.js', () => ({
   insertCourse: insertCourseMock,
+  listCourseCodesForScope: listCourseCodesForScopeMock,
   listCoursesByInstructor: listCoursesByInstructorMock,
 }))
 
@@ -63,8 +69,10 @@ describe('courses API', () => {
   beforeEach(() => {
     findProfileByIdMock.mockReset()
     insertCourseMock.mockReset()
+    listCourseCodesForScopeMock.mockReset()
     listCoursesByInstructorMock.mockReset()
     findProfileByIdMock.mockResolvedValue(instructorProfile)
+    listCourseCodesForScopeMock.mockResolvedValue([])
   })
 
   it('requires authentication', async () => {
@@ -121,6 +129,64 @@ describe('courses API', () => {
     expect(response.body).toEqual({ data: course, error: null })
     expect(insertCourseMock).toHaveBeenCalledWith(
       { ...validInput, code: 'IT301' },
+      'user-1',
+    )
+  })
+
+  it('generates a subject code when one is omitted', async () => {
+    insertCourseMock.mockResolvedValue({ ...course, code: 'WEB' })
+    const token = await signTestToken()
+
+    const response = await request(app)
+      .post('/api/courses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Web Systems',
+        term: 'first_trimester',
+        yearLevel: 3,
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.data.code).toBe('WEB')
+    expect(listCourseCodesForScopeMock).toHaveBeenCalledWith(
+      'user-1',
+      'first_trimester',
+      3,
+    )
+    expect(insertCourseMock).toHaveBeenCalledWith(
+      {
+        name: 'Web Systems',
+        term: 'first_trimester',
+        yearLevel: 3,
+        code: 'WEB',
+      },
+      'user-1',
+    )
+  })
+
+  it('uses a suffix when the generated code is taken', async () => {
+    listCourseCodesForScopeMock.mockResolvedValue(['WEB'])
+    insertCourseMock.mockResolvedValue({ ...course, code: 'WEB-2' })
+    const token = await signTestToken()
+
+    const response = await request(app)
+      .post('/api/courses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Web Systems',
+        term: 'first_trimester',
+        yearLevel: 3,
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.data.code).toBe('WEB-2')
+    expect(insertCourseMock).toHaveBeenCalledWith(
+      {
+        name: 'Web Systems',
+        term: 'first_trimester',
+        yearLevel: 3,
+        code: 'WEB-2',
+      },
       'user-1',
     )
   })

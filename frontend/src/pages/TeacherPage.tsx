@@ -1,10 +1,8 @@
-import { BookOpen, CircleAlert, ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Container } from '../components/layout/Container'
 import { SubjectForm } from '../components/teacher/SubjectForm'
 import { SubjectList } from '../components/teacher/SubjectList'
-import { Button } from '../components/ui/Button'
-import { ButtonLink } from '../components/ui/ButtonLink'
+import { TeacherAccessGate } from '../components/teacher/TeacherAccessGate'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
 import {
@@ -38,79 +36,8 @@ function PageHeading() {
   )
 }
 
-function TeacherPageSkeleton() {
-  return (
-    <div
-      className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]"
-      aria-busy="true"
-    >
-      <div className="h-96 animate-pulse rounded-lg bg-surface motion-reduce:animate-none" />
-      <div className="h-96 animate-pulse rounded-lg bg-surface motion-reduce:animate-none" />
-      <span className="sr-only">Loading teacher workspace</span>
-    </div>
-  )
-}
-
-function SignInGate({ onOpenAuth }: TeacherPageProps) {
-  return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
-      <span className="flex size-12 items-center justify-center rounded-lg bg-accent-purple">
-        <BookOpen className="size-6 text-ink" aria-hidden="true" />
-      </span>
-      <h2 className="mt-md text-heading-3">Sign in to manage your subjects</h2>
-      <p className="mt-xxs text-body-sm text-ink-muted">
-        Use your teacher account to create subjects and keep them organized.
-      </p>
-      <Button
-        variant="primary"
-        className="mt-md"
-        onClick={() => onOpenAuth('login')}
-      >
-        Sign in
-      </Button>
-    </div>
-  )
-}
-
-function AccessDenied() {
-  return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
-      <span className="flex size-12 items-center justify-center rounded-lg bg-canvas-soft">
-        <ShieldAlert className="size-6 text-ink-secondary" aria-hidden="true" />
-      </span>
-      <h2 className="mt-md text-heading-3">Teacher access required</h2>
-      <p className="mt-xxs text-body-sm text-ink-muted">
-        This workspace is available to instructor accounts.
-      </p>
-      <ButtonLink href="/" variant="secondary" className="mt-md">
-        Back to home
-      </ButtonLink>
-    </div>
-  )
-}
-
-function ProfileError() {
-  return (
-    <div
-      role="alert"
-      className="mt-xl flex max-w-xl items-start gap-xs rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
-    >
-      <CircleAlert
-        className="mt-xxs size-5 shrink-0 text-accent-orange-deep"
-        aria-hidden="true"
-      />
-      <div>
-        <h2 className="text-heading-3">We could not load your account</h2>
-        <p className="mt-xxs text-body-sm text-ink-muted">
-          Refresh the page or sign in again.
-        </p>
-      </div>
-    </div>
-  )
-}
-
 export function TeacherPage({ onOpenAuth }: TeacherPageProps) {
-  const { status, profile, profileError, session } = useAuth()
+  const { status, profile, session } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -168,6 +95,7 @@ export function TeacherPage({ onOpenAuth }: TeacherPageProps) {
       const created = await createCourse(input, accessToken)
       setLoadError(null)
       setCourses((current) => [created, ...current])
+      return created
     },
     [accessToken],
   )
@@ -176,25 +104,11 @@ export function TeacherPage({ onOpenAuth }: TeacherPageProps) {
     setReloadKey((key) => key + 1)
   }
 
-  const isProfileLoading =
-    status === 'authenticated' && !profile && !profileError
-  const isInstructor =
-    status === 'authenticated' && profile?.role === 'instructor'
-
   return (
     <section aria-labelledby="teacher-heading" className="py-xl lg:py-section">
       <Container>
         <PageHeading />
-
-        {status === 'loading' && <TeacherPageSkeleton />}
-        {isProfileLoading && <TeacherPageSkeleton />}
-        {status === 'anonymous' && <SignInGate onOpenAuth={onOpenAuth} />}
-        {status === 'authenticated' && profileError && <ProfileError />}
-        {status === 'authenticated' &&
-          profile &&
-          profile.role !== 'instructor' && <AccessDenied />}
-
-        {isInstructor && (
+        <TeacherAccessGate onOpenAuth={onOpenAuth}>
           <div className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
             <SubjectForm onCreate={handleCreate} />
             <SubjectList
@@ -204,7 +118,7 @@ export function TeacherPage({ onOpenAuth }: TeacherPageProps) {
               onRetry={handleRetry}
             />
           </div>
-        )}
+        </TeacherAccessGate>
       </Container>
     </section>
   )

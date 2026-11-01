@@ -19,6 +19,13 @@ export const COURSE_NAME_MAX_LENGTH = 120
 export const COURSE_CODE_MIN_LENGTH = 3
 export const COURSE_CODE_MAX_LENGTH = 20
 
+export const TOPIC_TITLE_MIN_LENGTH = 2
+export const TOPIC_TITLE_MAX_LENGTH = 120
+export const LESSON_TITLE_MIN_LENGTH = 2
+export const LESSON_TITLE_MAX_LENGTH = 160
+export const INITIAL_ORDER_INDEX = 0
+export const MAX_GENERATED_CODE_ATTEMPTS = 20
+
 export const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 export const AUTH_RATE_LIMIT_MAX = 10
 export const JSON_BODY_LIMIT = '1mb'

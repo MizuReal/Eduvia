@@ -5,22 +5,14 @@ import {
   createCourse as createCourseService,
   listCourses as listCoursesService,
 } from '../services/courseService.js'
-import type { AuthenticatedUser } from '../types/auth.js'
+import { requireAuthenticatedUser } from '../utils/authUser.js'
 import { formatZodError } from '../utils/validation.js'
-
-function requireUser(req: Request): AuthenticatedUser {
-  if (!req.user) {
-    throw new AppError(401, 'AUTH_REQUIRED', 'Authentication required.')
-  }
-
-  return req.user
-}
 
 export async function createCourseHandler(
   req: Request,
   res: Response,
 ): Promise<void> {
-  const user = requireUser(req)
+  const user = requireAuthenticatedUser(req)
   const parsed = createCourseSchema.safeParse(req.body)
 
   if (!parsed.success) {
@@ -41,7 +33,7 @@ export async function listCoursesHandler(
   req: Request,
   res: Response,
 ): Promise<void> {
-  const user = requireUser(req)
+  const user = requireAuthenticatedUser(req)
   const courses = await listCoursesService(user)
 
   res.status(200).json({ data: courses, error: null })

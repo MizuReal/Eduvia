@@ -7,10 +7,13 @@ const app = createApp()
 
 async function verifyDatabase(): Promise<void> {
   try {
-    const [profilesCheck, coursesCheck] = await Promise.all([
-      supabaseAdmin.from('profiles').select('id').limit(1),
-      supabaseAdmin.from('courses').select('id').limit(1),
-    ])
+    const [profilesCheck, coursesCheck, courseTopicsCheck, lessonsCheck] =
+      await Promise.all([
+        supabaseAdmin.from('profiles').select('id').limit(1),
+        supabaseAdmin.from('courses').select('id').limit(1),
+        supabaseAdmin.from('course_topics').select('id').limit(1),
+        supabaseAdmin.from('lessons').select('id').limit(1),
+      ])
 
     if (profilesCheck.error) {
       logger.error(
@@ -26,7 +29,19 @@ async function verifyDatabase(): Promise<void> {
       )
     }
 
-    if (!profilesCheck.error && !coursesCheck.error) {
+    if (courseTopicsCheck.error || lessonsCheck.error) {
+      logger.error(
+        { err: courseTopicsCheck.error ?? lessonsCheck.error },
+        'Database check failed. Apply schemas/003_outline.sql to the Supabase project.',
+      )
+    }
+
+    if (
+      !profilesCheck.error &&
+      !coursesCheck.error &&
+      !courseTopicsCheck.error &&
+      !lessonsCheck.error
+    ) {
       logger.info('Database connection verified')
     }
   } catch (error) {

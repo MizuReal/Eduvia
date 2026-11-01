@@ -1,10 +1,12 @@
 import {
+  ArrowRight,
   BookOpen,
   CalendarDays,
   CircleAlert,
   GraduationCap,
   RefreshCw,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { courseTermLabel, yearLevelLabel } from '../../config/course'
 import type { Course } from '../../types/course'
 import { Button } from '../ui/Button'
@@ -45,6 +47,15 @@ function SubjectCard({ course }: { course: Course }) {
           <dd>{yearLevelLabel(course.yearLevel)}</dd>
         </div>
       </dl>
+
+      <Link
+        to={`/teacher/subjects/${course.id}`}
+        className="mt-md inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-primary transition-colors hover:text-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label={`Open outline for ${course.name}`}
+      >
+        Open outline
+        <ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
     </li>
   )
 }

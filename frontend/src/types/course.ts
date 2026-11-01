@@ -12,7 +12,7 @@ export type Course = {
 
 export type CreateCourseInput = {
   name: string
-  code: string
+  code?: string
   term: CourseTerm
   yearLevel: YearLevel
 }

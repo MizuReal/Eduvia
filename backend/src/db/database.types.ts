@@ -45,6 +45,44 @@ export type CourseInsert = {
   deleted_at?: string | null
 }
 
+export type CourseTopicRow = {
+  id: string
+  course_id: string
+  title: string
+  order_index: number
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CourseTopicInsert = {
+  id?: string
+  course_id: string
+  title: string
+  order_index: number
+  deleted_at?: string | null
+}
+
+export type LessonRow = {
+  id: string
+  course_id: string
+  topic_id: string
+  title: string
+  order_index: number
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LessonInsert = {
+  id?: string
+  course_id: string
+  topic_id: string
+  title: string
+  order_index: number
+  deleted_at?: string | null
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -58,6 +96,18 @@ export type Database = {
         Row: CourseRow
         Insert: CourseInsert
         Update: Partial<CourseInsert>
+        Relationships: []
+      }
+      course_topics: {
+        Row: CourseTopicRow
+        Insert: CourseTopicInsert
+        Update: Partial<CourseTopicInsert>
+        Relationships: []
+      }
+      lessons: {
+        Row: LessonRow
+        Insert: LessonInsert
+        Update: Partial<LessonInsert>
         Relationships: []
       }
     }

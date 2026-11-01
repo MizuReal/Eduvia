@@ -183,8 +183,13 @@ These are stated once, here. Every other section assumes them.
 
 - Courses are `draft`, `published`, or `archived`. Only the owner or an admin may edit.
   Publishing requires at least one lesson with at least one block, and is transactional.
-- Lessons are ordered; reordering happens in one transaction and preserves a contiguous
-  `order_index`.
+- Course codes are generated from the course name when omitted, with a numeric suffix for
+  collisions in the same instructor/trimester/year-level scope. Custom codes remain supported and
+  must satisfy the same uniqueness rule.
+- Courses contain ordered topics; topics contain ordered lessons. The table of contents is the
+  ordered projection of those rows — there is no separate table-of-contents table.
+- Topics and lessons are ordered; reordering happens in one transaction and preserves a
+  contiguous `order_index`.
 - Lesson blocks have explicit types: `text`, `image`, `file`, `video`, `quiz`.
 - Course text is stored as Tiptap JSON and rendered through the shared renderer or converted to
   sanitized HTML server-side. Raw client HTML is never rendered.

@@ -4,6 +4,7 @@ import { AuthModal } from './components/auth/AuthModal'
 import { SiteFooter } from './components/layout/SiteFooter'
 import { SiteHeader } from './components/layout/SiteHeader'
 import { AuthProvider } from './context/AuthContext'
+import { CourseOutlinePage } from './pages/CourseOutlinePage'
 import HomePage from './pages/HomePage'
 import { TeacherPage } from './pages/TeacherPage'
 import type { AuthMode } from './types/auth'
@@ -34,6 +35,10 @@ function AppShell() {
           <Route
             path="/teacher"
             element={<TeacherPage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/teacher/subjects/:courseId"
+            element={<CourseOutlinePage onOpenAuth={openAuth} />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -39,6 +39,12 @@ const courseCodeSchema = z
   )
   .transform((value) => value.toUpperCase())
 
+const optionalCourseCodeSchema = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  courseCodeSchema.optional(),
+)
+
 const courseTermSchema = z.enum(COURSE_TERMS, {
   message: 'Select a trimester.',
 })
@@ -57,7 +63,7 @@ const yearLevelSchema = z.preprocess(
 
 export const createCourseSchema = z.strictObject({
   name: courseNameSchema,
-  code: courseCodeSchema,
+  code: optionalCourseCodeSchema,
   term: courseTermSchema,
   yearLevel: yearLevelSchema,
 })

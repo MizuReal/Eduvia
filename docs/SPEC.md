@@ -4,9 +4,10 @@ The detailed product contract behind `AGENTS.md`. `AGENTS.md` holds the operatin
 file holds the shapes, limits, state machines, and policies. Where the two overlap, `AGENTS.md`
 wins on process and this file wins on detail.
 
-Scope note: the implemented surface today is auth, profiles, and courses (migrations
-`001_profiles.sql`, `002_courses.sql`). Lessons, files, and quizzes below are the target
-contract — build them to this spec, not to an approximation of it.
+Scope note: the implemented surface today is auth, profiles, courses, and the course outline
+(`course_topics` plus lesson entries), across migrations `001_profiles.sql`,
+`002_courses.sql`, and `003_outline.sql`. Lesson content blocks, files, and quizzes below are
+the target contract — build them to this spec, not to an approximation of it.
 
 ---
 
@@ -20,13 +21,14 @@ POST   /api/auth/register                                    ✓
 GET    /api/users/me                                         ✓
 GET    /api/courses                                          ✓ instructor-only
 POST   /api/courses                                          ✓ instructor-only
-GET    /api/courses/:courseId
+GET    /api/courses/:courseId                                 ✓ instructor-only
 PATCH  /api/courses/:courseId
 POST   /api/courses/:courseId/publish
 POST   /api/courses/:courseId/archive
 
 GET    /api/courses/:courseId/lessons
-POST   /api/courses/:courseId/lessons
+POST   /api/courses/:courseId/topics                          ✓ instructor-only
+POST   /api/courses/:courseId/lessons                         ✓ instructor-only
 PATCH  /api/lessons/:lessonId
 DELETE /api/lessons/:lessonId
 POST   /api/lessons/:lessonId/blocks
@@ -59,6 +61,14 @@ GET    /api/admin/users
 PATCH  /api/admin/users/:userId/role
 ```
 
+- `POST /api/courses` accepts an optional `code`. When it is omitted, the server generates one
+  from the subject name and appends `-2`, `-3`, etc. if that code is already used in the same
+  instructor/trimester/year-level scope. If a custom code is supplied, it is used as-is and a
+  collision returns `409 COURSE_CODE_TAKEN`.
+- `GET /api/courses/:courseId` returns the subject plus its ordered `topics`, each containing its
+  ordered `lessons`. The table of contents is derived from those orders.
+- `POST /api/courses/:courseId/topics` accepts `{ "title": string }`.
+- `POST /api/courses/:courseId/lessons` accepts `{ "topicId": uuid, "title": string }`.
 - Uploads are `multipart/form-data`: a single `file` field plus the target course or lesson id.
 - JSON bodies are capped at 1 MB (`JSON_BODY_LIMIT`); upload limits come from the per-type table
   in §2.
@@ -205,15 +215,20 @@ Results show per-question feedback with an icon **and** text — never color alo
 
 ### Core tables
 
-`profiles`, `courses`, `lessons`, `lesson_blocks`, `files`, `quizzes`, `quiz_questions`,
-`quiz_options`, `quiz_attempts`, `attempt_answers`, `enrollments`, `lesson_progress`,
-`audit_logs`.
+`profiles`, `courses`, `course_topics`, `lessons`, `lesson_blocks`, `files`, `quizzes`,
+`quiz_questions`, `quiz_options`, `quiz_attempts`, `attempt_answers`, `enrollments`,
+`lesson_progress`, `audit_logs`.
 
 ### Constraints
 
 - `profiles.id` references `auth.users.id`; `profiles.role` is constrained to `student`,
   `instructor`, or `admin`. Only an admin may change a role.
+- `courses` is unique on `(instructor_id, code, term, year_level)` where the course is not
+  soft-deleted. Generated codes use this same scope; custom codes must satisfy it too.
 - `enrollments` is unique on `(course_id, student_id)`.
+- `course_topics` is unique on `(id, course_id)`; `lessons` references that pair with a composite
+  `(topic_id, course_id)` foreign key.
+- Topics and lessons use an `order_index`; the table of contents is their ordered projection.
 - `lesson_progress` is unique on `(lesson_id, student_id)`.
 - `attempt_answers` is unique on `(attempt_id, question_id)`.
 - `quizzes.version` increases monotonically; editing a published quiz increments it.
@@ -233,14 +248,15 @@ through short-lived signed URLs. The backend writes course-scoped paths and reco
 - **Student** — reads own profile, content and quizzes of published courses they are enrolled in,
   own enrollments, own attempts and lesson progress; writes own profile, own in-progress answers,
   own enrollments and lesson progress.
-- **Instructor** — reads and writes own courses, lessons, blocks, quizzes, files; reads the
-  enrollments and attempts for their courses; writes enrollment for courses they manage.
+- **Instructor** — reads and writes own courses, course topics, lessons, blocks, quizzes, files;
+  reads the enrollments and attempts for their courses; writes enrollment for courses they
+  manage.
 - **Admin** — reads and writes all rows and all storage objects.
 
 Draft and archived courses are visible only to their owner and admins. Policies use `auth.uid()`
 and a trusted role helper — never a role claim supplied or editable by the client. Storage
 policies mirror table policies: owners, enrolled students, and admins only.
 
-Shipped behavior is currently narrower than this matrix: `GET /api/courses` sits behind
-`requireAuth` + `requireRole('instructor')`. The student and anonymous catalog rows above are
-target behavior, not current behavior.
+Shipped behavior is currently narrower than this matrix: the entire `/api/courses` surface,
+including the outline routes, sits behind `requireAuth` + `requireRole('instructor')`. The
+student and anonymous catalog rows above are target behavior, not current behavior.

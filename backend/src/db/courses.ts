@@ -1,7 +1,7 @@
 import { AppError } from '../errors/AppError.js'
 import { logger } from '../logger.js'
 import type { CreateCourseInput } from '../schemas/course.js'
-import type { Course } from '../types/course.js'
+import type { Course, CourseTerm, YearLevel } from '../types/course.js'
 import type { CourseRow } from './database.types.js'
 import { supabaseAdmin } from './supabaseAdmin.js'
 
@@ -23,6 +23,30 @@ function toCourse(row: CourseSelectRow): Course {
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   }
+}
+
+export async function findCourseForInstructor(
+  courseId: string,
+  instructorId: string,
+): Promise<Course | null> {
+  const { data, error } = await supabaseAdmin
+    .from('courses')
+    .select(COURSE_COLUMNS)
+    .eq('id', courseId)
+    .eq('instructor_id', instructorId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) {
+    logger.error({ err: error, courseId, instructorId }, 'Course lookup failed')
+    throw new AppError(
+      503,
+      'COURSE_LOOKUP_FAILED',
+      'We could not load that subject. Try again.',
+    )
+  }
+
+  return data ? toCourse(data) : null
 }
 
 export async function listCoursesByInstructor(
@@ -47,8 +71,36 @@ export async function listCoursesByInstructor(
   return (data ?? []).map(toCourse)
 }
 
+export async function listCourseCodesForScope(
+  instructorId: string,
+  term: CourseTerm,
+  yearLevel: YearLevel,
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from('courses')
+    .select('code')
+    .eq('instructor_id', instructorId)
+    .eq('term', term)
+    .eq('year_level', yearLevel)
+    .is('deleted_at', null)
+
+  if (error) {
+    logger.error(
+      { err: error, instructorId, term, yearLevel },
+      'Course code lookup failed',
+    )
+    throw new AppError(
+      503,
+      'COURSE_CODE_LOOKUP_FAILED',
+      'We could not prepare a subject code. Try again.',
+    )
+  }
+
+  return (data ?? []).map((row) => row.code)
+}
+
 export async function insertCourse(
-  input: CreateCourseInput,
+  input: Omit<CreateCourseInput, 'code'> & { code: string },
   instructorId: string,
 ): Promise<Course> {
   const { data, error } = await supabaseAdmin

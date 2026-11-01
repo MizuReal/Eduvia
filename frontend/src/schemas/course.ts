@@ -39,6 +39,12 @@ const courseCodeSchema = z
   )
   .transform((value) => value.toUpperCase())
 
+const optionalCourseCodeSchema = z.preprocess(
+  (value) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  courseCodeSchema.optional(),
+)
+
 const courseTermSchema = z.enum(COURSE_TERMS, {
   message: 'Select a trimester.',
 })
@@ -57,10 +63,36 @@ const yearLevelSchema = z.preprocess(
 
 export const createCourseSchema = z.strictObject({
   name: courseNameSchema,
-  code: courseCodeSchema,
+  code: optionalCourseCodeSchema,
   term: courseTermSchema,
   yearLevel: yearLevelSchema,
 })
 
+const courseFormTermSchema = z
+  .string()
+  .refine(
+    (value): value is CourseTerm => COURSE_TERMS.includes(value as CourseTerm),
+    'Select a trimester.',
+  )
+  .transform((value) => value as CourseTerm)
+
+const courseFormYearLevelSchema = z
+  .string()
+  .refine(
+    (value): value is `${YearLevel}` =>
+      YEAR_LEVELS.some((level) => String(level) === value),
+    'Select a year level.',
+  )
+  .transform((value) => Number(value) as YearLevel)
+
+export const createCourseFormSchema = z.object({
+  name: courseNameSchema,
+  code: z.union([courseCodeSchema, z.literal('')]),
+  term: courseFormTermSchema,
+  yearLevel: courseFormYearLevelSchema,
+})
+
 export type CreateCourseValues = z.infer<typeof createCourseSchema>
+export type CreateCourseFormInput = z.input<typeof createCourseFormSchema>
+export type CreateCourseFormOutput = z.output<typeof createCourseFormSchema>
 export type { CourseTerm, YearLevel }
