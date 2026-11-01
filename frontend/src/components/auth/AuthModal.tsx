@@ -67,6 +67,8 @@ export function AuthModal({
   }, [])
 
   return (
+    // Backdrop clicks are an optional mouse affordance; Escape is handled by onCancel.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={dialogRef}
       aria-modal="true"
@@ -89,7 +91,9 @@ export function AuthModal({
           <div className="flex items-start justify-between gap-md">
             <div>
               <h2 id="auth-dialog-title" className="text-heading-3">
-                {isRegister ? 'Create your Eduvia account' : 'Sign in to Eduvia'}
+                {isRegister
+                  ? 'Create your Eduvia account'
+                  : 'Sign in to Eduvia'}
               </h2>
               <p
                 id="auth-dialog-description"

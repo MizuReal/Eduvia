@@ -1,8 +1,8 @@
 import { Container } from './Container'
 
 const FOOTER_LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#roles', label: 'For every role' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#roles', label: 'For every role' },
   { href: '#top', label: 'Back to top' },
 ] as const
 
@@ -25,7 +25,11 @@ export function SiteFooter() {
 
           <nav aria-label="Footer" className="flex flex-wrap gap-md">
             {FOOTER_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className={FOOTER_LINK_CLASSES}>
+              <a
+                key={link.href}
+                href={link.href}
+                className={FOOTER_LINK_CLASSES}
+              >
                 {link.label}
               </a>
             ))}

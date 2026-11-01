@@ -1,6 +1,8 @@
 const configuredApiUrl = import.meta.env.VITE_API_URL
 const API_BASE_URL =
-  typeof configuredApiUrl === 'string' ? configuredApiUrl.replace(/\/+$/, '') : ''
+  typeof configuredApiUrl === 'string'
+    ? configuredApiUrl.replace(/\/+$/, '')
+    : ''
 
 if (!API_BASE_URL) {
   throw new Error('VITE_API_URL is missing. Fill frontend/.env.')
@@ -47,7 +49,11 @@ export class ApiError extends Error {
 }
 
 function isApiFailure(payload: unknown): payload is ApiFailure {
-  if (typeof payload !== 'object' || payload === null || !('error' in payload)) {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('error' in payload)
+  ) {
     return false
   }
 
@@ -101,7 +107,11 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     }
 
     if (!isApiSuccess<T>(payload)) {
-      throw new ApiError('INVALID_RESPONSE', 'Something went wrong.', response.status)
+      throw new ApiError(
+        'INVALID_RESPONSE',
+        'Something went wrong.',
+        response.status,
+      )
     }
 
     return payload.data
@@ -127,6 +137,20 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
 export function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function postAuth<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify(body),
   })
 }

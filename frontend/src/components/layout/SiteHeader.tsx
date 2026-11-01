@@ -1,5 +1,6 @@
 import { Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { messageForAuthError } from '../auth/errors'
 import { Button } from '../ui/Button'
 import type { AuthMode } from '../../types/auth'
@@ -7,8 +8,8 @@ import { useAuth } from '../../context/AuthContext'
 import { Container } from './Container'
 
 const NAV_LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#roles', label: 'For every role' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#roles', label: 'For every role' },
 ] as const
 
 const NAV_LINK_CLASSES =
@@ -110,6 +111,7 @@ type SiteHeaderProps = {
 export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const { profile } = useAuth()
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -139,12 +141,12 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas">
       <Container className="flex items-center justify-between gap-md py-sm">
-        <a
-          href="#top"
+        <Link
+          to="/"
           className="rounded-sm text-title text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           Eduvia
-        </a>
+        </Link>
 
         <div className="hidden items-center gap-lg md:flex">
           <nav aria-label="Primary" className="flex items-center gap-xxs">
@@ -153,6 +155,11 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
                 {link.label}
               </a>
             ))}
+            {profile?.role === 'instructor' && (
+              <Link to="/teacher" className={NAV_LINK_CLASSES}>
+                Teacher
+              </Link>
+            )}
           </nav>
           <AuthControls layout="desktop" onOpenAuth={onOpenAuth} />
         </div>
@@ -175,7 +182,10 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
       </Container>
 
       {isMenuOpen && (
-        <div id="mobile-navigation" className="border-t border-hairline md:hidden">
+        <div
+          id="mobile-navigation"
+          className="border-t border-hairline md:hidden"
+        >
           <Container className="py-sm">
             <nav aria-label="Mobile" className="flex flex-col gap-xxs">
               {NAV_LINKS.map((link) => (
@@ -188,11 +198,17 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
                   {link.label}
                 </a>
               ))}
+              {profile?.role === 'instructor' && (
+                <Link
+                  to="/teacher"
+                  className={NAV_LINK_CLASSES}
+                  onClick={closeMenu}
+                >
+                  Teacher
+                </Link>
+              )}
               <div className="mt-xs border-t border-hairline pt-sm">
-                <AuthControls
-                  layout="mobile"
-                  onOpenAuth={openAuthFromMobile}
-                />
+                <AuthControls layout="mobile" onOpenAuth={openAuthFromMobile} />
               </div>
             </nav>
           </Container>
