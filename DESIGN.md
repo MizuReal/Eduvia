@@ -110,6 +110,8 @@ spacing:
   lg: 24px
   xl: 28px
   xxl: 32px
+  section: 64px
+  section-lg: 96px
 
 components:
   nav-bar:
@@ -331,6 +333,7 @@ Notion's type voice is **tight, heavy, and quiet-confident**. Headlines lean on 
 - **Base unit**: 8px.
 - **Tokens (front matter)**: `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 16px · `{spacing.lg}` 24px · `{spacing.xl}` 28px · `{spacing.xxl}` 32px.
 - Card interior padding lands around `{spacing.lg}` (24px); utility buttons use a tight 4px/14px; form fields pad at `{spacing.xxs}`-scale 6px. Section gaps stack the larger steps.
+- **Section rhythm**: `{spacing.section}` (64px) and `{spacing.section-lg}` (96px) separate major page bands; component padding stays on the 4–32px steps.
 
 ### Grid & Container
 Content is centred in a wide max-width column (~1080–1300px on desktop per the extracted breakpoints) with generous outer gutters. Feature sections alternate between full-width text blocks and 2-up / 3-up card grids; the pricing page widens to a 4-column plan table. The dark hero spans full-bleed edge to edge while body sections respect the centred container.
