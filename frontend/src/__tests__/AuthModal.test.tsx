@@ -71,6 +71,11 @@ describe('AuthModal', () => {
     const user = userEvent.setup()
     const { dialog, onClose } = renderModal('register')
 
+    expect(screen.getByTestId('lottie')).toHaveAttribute(
+      'data-src',
+      '/animations/graduation_cap.json',
+    )
+
     await user.click(
       within(dialog).getByRole('button', { name: 'Create account' }),
     )
@@ -276,11 +281,40 @@ describe('AuthModal', () => {
     )
   })
 
+  it('toggles password visibility', async () => {
+    const user = userEvent.setup()
+    const { dialog } = renderModal('login')
+    const password = within(dialog).getByLabelText('Password')
+
+    expect(password).toHaveAttribute('type', 'password')
+
+    await user.type(password, 'Secret123!')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Show password' }),
+    )
+
+    expect(password).toHaveAttribute('type', 'text')
+    expect(
+      within(dialog).getByRole('button', { name: 'Hide password' }),
+    ).toBeInTheDocument()
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Hide password' }),
+    )
+
+    expect(password).toHaveAttribute('type', 'password')
+  })
+
   it('shows a generic invalid-credentials alert on login', async () => {
     const user = userEvent.setup()
     const { dialog, onClose } = renderModal('login')
     authMocks.signIn.mockRejectedValue(
       new AuthError('INVALID_CREDENTIALS', 'Invalid username or password.'),
+    )
+
+    expect(screen.getByTestId('lottie')).toHaveAttribute(
+      'data-src',
+      '/animations/graduation_cap.json',
     )
 
     await user.type(within(dialog).getByLabelText('Username'), 'juan')

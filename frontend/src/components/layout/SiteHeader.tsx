@@ -146,9 +146,17 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
       <Container className="flex items-center justify-between gap-md py-sm">
         <Link
           to="/"
-          className="rounded-sm text-title text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          aria-label="Eduvia home"
+          className="flex items-center gap-xs rounded-sm text-title text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          Eduvia
+          <img
+            src="/assets/icon.png"
+            alt=""
+            width={36}
+            height={36}
+            className="size-9 rounded-md object-contain"
+          />
+          <span>Eduvia</span>
         </Link>
 
         <div className="hidden items-center gap-lg md:flex">

@@ -507,6 +507,7 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 
 **`hero-band`** — Dark "night" hero
 - Full-bleed deep indigo `{colors.secondary}` band carrying `{typography.display-1}` white headline, sticker-constellation field, and a `button-primary` + `button-secondary` CTA pair. The single inverted dark island in an otherwise daylight page.
+- A fixed-size teacher-owl Lottie sits above the eyebrow with a transparent background, keeping the animation readable against the dark band. It pauses under `prefers-reduced-motion`.
 
 **`badge-pill`** — Eyebrow / category pill
 - White surface `{colors.surface}`, `{colors.primary}` text, `{typography.eyebrow}` (12px / 600), fully pill `{rounded.full}`, padding `4px 8px`. Small labels such as the pricing "Essential for staying organized" eyebrow and category tags.
@@ -538,6 +539,7 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 
 **`ex-auth-form-card`** — Sign-in / sign-up card. Re-uses feature-card chrome with text-input primitives inside.
 - Properties: `backgroundColor`, `rounded`, `padding`
+- Both auth modes show a compact graduation-cap Lottie above the form. The animation is decorative, transparent, fixed-size, and pauses under `prefers-reduced-motion`.
 
 **`ex-modal-card`** — Modal dialog surface — same chrome as feature-card with elevated shadow.
 - Properties: `backgroundColor`, `rounded`, `padding`

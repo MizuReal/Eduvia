@@ -15,6 +15,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { Container } from '../components/layout/Container'
 import { ButtonLink } from '../components/ui/ButtonLink'
+import { LottieVisual } from '../components/ui/LottieVisual'
 
 type Accent = 'purple' | 'sky' | 'teal' | 'orange' | 'green' | 'pink'
 
@@ -237,8 +238,14 @@ export default function HomePage() {
           </div>
 
           <div className="w-full max-w-3xl text-center">
+            <div className="mx-auto mb-md w-fit">
+              <LottieVisual
+                src="/animations/teacher_owl.json"
+                className="h-24 w-48 sm:h-28 sm:w-56"
+              />
+            </div>
             <span className="inline-flex items-center rounded-full bg-surface px-xs py-xxs text-eyebrow text-primary shadow-soft">
-              A calmer learning management system
+              LEARN SMARTER. GROW FASTER.
             </span>
             <h1
               id="hero-heading"

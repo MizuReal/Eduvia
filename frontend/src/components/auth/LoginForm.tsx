@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import { Eye, EyeOff, IdCard, LockKeyhole, LogIn } from 'lucide-react'
 import { loginSchema } from '../../schemas/auth'
 import { signIn } from '../../services/authService'
 import { Button } from '../ui/Button'
@@ -23,6 +24,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [errors, setErrors] = useState<FieldErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +83,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
       <div>
         <label htmlFor="login-username" className={FIELD_LABEL_CLASSES}>
-          Username
+          <span className="inline-flex items-center gap-xs">
+            <span className="flex size-6 items-center justify-center rounded-md bg-accent-sky text-ink">
+              <IdCard className="size-3.5" aria-hidden="true" />
+            </span>
+            Username
+          </span>
         </label>
         <input
           id="login-username"
@@ -109,19 +116,40 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
       <div>
         <label htmlFor="login-password" className={FIELD_LABEL_CLASSES}>
-          Password
+          <span className="inline-flex items-center gap-xs">
+            <span className="flex size-6 items-center justify-center rounded-md bg-accent-purple text-ink">
+              <LockKeyhole className="size-3.5" aria-hidden="true" />
+            </span>
+            Password
+          </span>
         </label>
-        <input
-          id="login-password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          value={values.password}
-          onChange={handleChange}
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby={errors.password ? 'login-password-error' : undefined}
-          className={FIELD_INPUT_CLASSES}
-        />
+        <div className="relative">
+          <input
+            id="login-password"
+            name="password"
+            type={isPasswordVisible ? 'text' : 'password'}
+            autoComplete="current-password"
+            value={values.password}
+            onChange={handleChange}
+            aria-invalid={Boolean(errors.password)}
+            aria-describedby={
+              errors.password ? 'login-password-error' : undefined
+            }
+            className={`${FIELD_INPUT_CLASSES} pr-12`}
+          />
+          <button
+            type="button"
+            aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+            onClick={() => setIsPasswordVisible((visible) => !visible)}
+            className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-xs text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {isPasswordVisible ? (
+              <EyeOff className="size-4" aria-hidden="true" />
+            ) : (
+              <Eye className="size-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
         <FieldError id="login-password-error" message={errors.password} />
       </div>
 
@@ -131,6 +159,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         className="w-full"
         disabled={isSubmitting}
       >
+        <LogIn className="size-4" aria-hidden="true" />
         {isSubmitting ? 'Signing in…' : 'Sign in'}
       </Button>
     </form>

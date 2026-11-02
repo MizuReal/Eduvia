@@ -1,7 +1,32 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { clearResponseCache } from '../services/responseCache'
+
+vi.mock('lottie-react', async () => {
+  const React = await vi.importActual<typeof import('react')>('react')
+
+  return {
+    Lottie: ({
+      src,
+      className,
+      autoplay,
+      loop,
+    }: {
+      src: string
+      className?: string
+      autoplay?: boolean
+      loop?: boolean
+    }) =>
+      React.createElement('div', {
+        'data-testid': 'lottie',
+        'data-src': src,
+        'data-autoplay': String(autoplay),
+        'data-loop': String(loop),
+        className,
+      }),
+  }
+})
 
 if (typeof HTMLDialogElement !== 'undefined') {
   if (typeof HTMLDialogElement.prototype.showModal !== 'function') {

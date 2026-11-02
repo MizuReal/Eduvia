@@ -15,7 +15,8 @@ and content. Web-only — there is no mobile client and no media transcoding pip
 
 - **Frontend** — React 19, Vite 8, Tailwind CSS v4 (`@tailwindcss/vite`), React Router 6,
   react-hook-form + Zod, Tiptap 3, react-dropzone, `@dnd-kit` sortable controls,
-  `@tanstack/react-table` for result summaries, Vitest + React Testing Library.
+  `@tanstack/react-table` for result summaries, `lottie-react` for decorative motion,
+  Vitest + React Testing Library.
 - **Backend** — Node.js ESM, Express 5, strict TypeScript (NodeNext), Zod 4, Supabase JS,
   jose, pino, helmet, multer, file-type, mammoth, sharp, yauzl, sanitize-html, Vitest + Supertest.
   Presentation previews also require LibreOffice (`soffice`) and Poppler (`pdftoppm`).

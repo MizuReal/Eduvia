@@ -1,6 +1,7 @@
-import { X } from 'lucide-react'
+import { LogIn, UserPlus, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { AuthMode } from '../../types/auth'
+import { LottieVisual } from '../ui/LottieVisual'
 import { useToast } from '../ui/toastContext'
 import { LoginForm } from './LoginForm'
 import { RegisterForm } from './RegisterForm'
@@ -127,6 +128,13 @@ export function AuthModal({
             </button>
           </div>
 
+          <div className="mt-sm flex justify-center">
+            <LottieVisual
+              src="/animations/graduation_cap.json"
+              className="size-20"
+            />
+          </div>
+
           {isRegister ? (
             <RegisterForm onSuccess={handleFormSuccess} />
           ) : (
@@ -137,9 +145,14 @@ export function AuthModal({
             {isRegister ? 'Already have an account?' : 'New to Eduvia?'}{' '}
             <button
               type="button"
-              className={SWITCH_BUTTON_CLASSES}
+              className={`${SWITCH_BUTTON_CLASSES} inline-flex items-center gap-xxs`}
               onClick={() => onModeChange(isRegister ? 'login' : 'register')}
             >
+              {isRegister ? (
+                <LogIn className="size-4" aria-hidden="true" />
+              ) : (
+                <UserPlus className="size-4" aria-hidden="true" />
+              )}
               {isRegister ? 'Sign in' : 'Create an account'}
             </button>
           </p>

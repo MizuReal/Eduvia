@@ -43,6 +43,14 @@ describe('App', () => {
       name: /one workspace, three points of view/i,
     })
     expect(within(roles).getAllByRole('heading', { level: 3 })).toHaveLength(3)
+
+    expect(screen.getByTestId('lottie')).toHaveAttribute(
+      'data-src',
+      '/animations/teacher_owl.json',
+    )
+    expect(
+      document.querySelectorAll('img[src="/assets/icon.png"]'),
+    ).toHaveLength(2)
   })
 
   it('opens and closes the mobile menu with the keyboard', async () => {

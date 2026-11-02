@@ -17,7 +17,16 @@ export function SiteFooter() {
       <Container className="py-xxl">
         <div className="flex flex-col gap-lg sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-title text-ink">Eduvia</p>
+            <div className="flex items-center gap-xs">
+              <img
+                src="/assets/icon.png"
+                alt=""
+                width={32}
+                height={32}
+                className="size-8 rounded-md object-contain"
+              />
+              <p className="text-title text-ink">Eduvia</p>
+            </div>
             <p className="mt-xxs text-body-sm text-ink-muted">
               A calm place to teach and learn.
             </p>
