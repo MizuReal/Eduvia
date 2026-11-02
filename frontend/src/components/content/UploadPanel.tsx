@@ -31,8 +31,8 @@ export function UploadPanel({
         heading={upload ? 'Replace presentation' : 'Upload presentation'}
         description={
           upload
-            ? 'Upload a new PPTX or PDF. The original file is replaced after the new upload is ready.'
-            : 'Keep the original PPTX or PDF and add a summary for learners.'
+            ? 'Upload a new PPTX or PDF. The original file is replaced after the new upload is ready, and student slide previews are prepared automatically.'
+            : 'Keep the original PPTX or PDF and add a summary for learners. Student slide previews are prepared automatically.'
         }
         submitLabel={upload ? 'Replace presentation' : 'Upload presentation'}
         initialTitle={upload?.title}

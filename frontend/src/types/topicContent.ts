@@ -73,6 +73,35 @@ export type PresentationContentItem = TopicContentSummary & {
   assets: []
 }
 
+export type TopicFileWithUrl = TopicFile & {
+  url: string
+  expiresAt: string
+}
+
+export type PresentationPreview = {
+  pageNumber: number
+  url: string
+  expiresAt: string
+}
+
+export type StudentPresentationContentItem = Omit<
+  PresentationContentItem,
+  'file'
+> & {
+  file: TopicFileWithUrl
+  previews: PresentationPreview[]
+}
+
+export type StudentTopicContent = {
+  topic: {
+    id: string
+    title: string
+    courseId: string
+  }
+  slides: SlidesContentItem | null
+  upload: StudentPresentationContentItem | null
+}
+
 export type TopicContentItem =
   | DocContentItem
   | SlidesContentItem

@@ -48,6 +48,7 @@ vi.mock('../src/db/courseOutline.js', () => ({
   findDeletedLessonForInstructor: vi.fn(),
   findDeletedTopicForInstructor: vi.fn(),
   findLessonForInstructor: vi.fn(),
+  findTopicById: vi.fn(),
   findTopicForCourse: vi.fn(),
   findTopicForInstructor: mocks.findTopicForInstructor,
   getCourseTrash: vi.fn(),
@@ -103,7 +104,9 @@ vi.mock('../src/db/files.js', () => ({
 vi.mock('../src/storage/courseFiles.js', () => ({
   createSignedUrlForCourseFile: vi.fn(),
   createSignedUrlsForCourseFiles: mocks.createSignedUrlsForCourseFiles,
+  listCourseFilePaths: vi.fn(),
   removeCourseFile: vi.fn(),
+  removeCourseFiles: vi.fn(),
   uploadCourseFile: vi.fn(),
 }))
 

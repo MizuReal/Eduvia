@@ -37,18 +37,50 @@ export async function uploadCourseFile(
 }
 
 export async function removeCourseFile(storagePath: string): Promise<void> {
+  await removeCourseFiles([storagePath])
+}
+
+export async function removeCourseFiles(
+  storagePaths: string[],
+): Promise<void> {
+  if (storagePaths.length === 0) {
+    return
+  }
+
   const { error } = await supabaseAdmin.storage
     .from(COURSE_FILES_BUCKET)
-    .remove([storagePath])
+    .remove(storagePaths)
 
   if (error) {
-    logger.error({ err: error, storagePath }, 'Course file removal failed')
+    logger.error({ err: error, storagePaths }, 'Course file removal failed')
     throw new AppError(
       502,
       'FILE_REMOVE_FAILED',
       'We could not clean up that file.',
     )
   }
+}
+
+export async function listCourseFilePaths(prefix: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin.storage
+    .from(COURSE_FILES_BUCKET)
+    .list(prefix, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    })
+
+  if (error) {
+    logger.error({ err: error, prefix }, 'Course file list failed')
+    throw new AppError(
+      502,
+      'FILE_LIST_FAILED',
+      'We could not load those files. Try again.',
+    )
+  }
+
+  return (data ?? [])
+    .filter((entry) => entry.id && entry.name)
+    .map((entry) => `${prefix}/${entry.name}`)
 }
 
 export async function createSignedUrlForCourseFile(

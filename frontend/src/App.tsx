@@ -10,6 +10,7 @@ import { StudentEnrollPage } from './pages/StudentEnrollPage'
 import { StudentPage } from './pages/StudentPage'
 import { StudentRosterPage } from './pages/StudentRosterPage'
 import { StudentSubjectPage } from './pages/StudentSubjectPage'
+import { StudentTopicPage } from './pages/StudentTopicPage'
 import { TeacherPage } from './pages/TeacherPage'
 import type { AuthMode } from './types/auth'
 
@@ -87,6 +88,10 @@ function AppShell() {
           <Route
             path="/student/subjects/:courseId"
             element={<StudentSubjectPage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={openAuth} />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

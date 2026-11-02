@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StudentEnrollPage } from '../pages/StudentEnrollPage'
 import { StudentPage } from '../pages/StudentPage'
 import { StudentSubjectPage } from '../pages/StudentSubjectPage'
+import { StudentTopicPage } from '../pages/StudentTopicPage'
 
 type MockProfile = {
   id: string
@@ -46,6 +47,16 @@ const enrollmentMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../services/enrollmentService', () => enrollmentMocks)
+
+const studentContentMocks = vi.hoisted(() => ({
+  getStudentTopicContent: vi.fn(),
+}))
+
+vi.mock('../services/studentContentService', () => studentContentMocks)
+
+vi.mock('../components/content/TiptapRenderer', () => ({
+  TiptapRenderer: ({ label }: { label: string }) => <p>{label}</p>,
+}))
 
 const courseId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
 const timestamp = '2026-11-02T00:00:00.000Z'
@@ -104,6 +115,82 @@ const subject = {
   ],
 }
 
+const topicId = '33333333-3333-4333-8333-333333333333'
+
+const topicContent = {
+  topic: {
+    id: topicId,
+    title: 'HTML foundations',
+    courseId,
+  },
+  slides: {
+    id: '55555555-5555-4555-8555-555555555555',
+    courseId,
+    topicId,
+    kind: 'slides' as const,
+    title: 'Created slides',
+    orderIndex: 0,
+    slideCount: 2,
+    summary: null,
+    file: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    assets: [],
+    content: {
+      version: 1 as const,
+      slides: [
+        {
+          id: '66666666-6666-4666-8666-666666666666',
+          content: { type: 'doc', content: [{ type: 'paragraph' }] },
+        },
+        {
+          id: '77777777-7777-4777-8777-777777777777',
+          content: { type: 'doc', content: [{ type: 'paragraph' }] },
+        },
+      ],
+    },
+  },
+  upload: {
+    id: '88888888-8888-4888-8888-888888888888',
+    courseId,
+    topicId,
+    kind: 'presentation' as const,
+    title: 'Uploaded lecture',
+    orderIndex: 0,
+    slideCount: null,
+    summary: 'A presentation summary that is long enough to be valid.',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    assets: [],
+    content: {},
+    file: {
+      id: '99999999-9999-4999-8999-999999999999',
+      originalName: 'lecture.pptx',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      sizeBytes: 2048,
+      fileClass: 'document' as const,
+      width: null,
+      height: null,
+      status: 'ready' as const,
+      url: 'https://signed.test/original',
+      expiresAt: timestamp,
+    },
+    previews: [
+      {
+        pageNumber: 1,
+        url: 'https://signed.test/slide-1',
+        expiresAt: timestamp,
+      },
+      {
+        pageNumber: 2,
+        url: 'https://signed.test/slide-2',
+        expiresAt: timestamp,
+      },
+    ],
+  },
+}
+
 function studentAuth() {
   authState.current = {
     status: 'authenticated',
@@ -121,7 +208,9 @@ function studentAuth() {
 describe('student pages', () => {
   beforeEach(() => {
     Object.values(enrollmentMocks).forEach((mock) => mock.mockReset())
+    Object.values(studentContentMocks).forEach((mock) => mock.mockReset())
     studentAuth()
+    studentContentMocks.getStudentTopicContent.mockResolvedValue(topicContent)
     enrollmentMocks.getStudentDashboard.mockResolvedValue({
       active: [activeEnrollment],
       pending: [pendingEnrollment],
@@ -211,6 +300,97 @@ describe('student pages', () => {
     expect(screen.getByText('HTML foundations')).toBeInTheDocument()
     expect(screen.getByText('Semantic HTML')).toBeInTheDocument()
     expect(screen.getByText(/@teacher_one/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Open HTML foundations' }),
+    ).toHaveAttribute(
+      'href',
+      `/student/subjects/${courseId}/topics/${topicId}`,
+    )
+  })
+
+  it('shows uploaded slide previews and switches to created slides', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'HTML foundations' }),
+    ).toBeInTheDocument()
+    expect(screen.getByAltText('Slide 1 of 2')).toHaveAttribute(
+      'src',
+      'https://signed.test/slide-1',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByAltText('Slide 2 of 2')).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Created slides' }),
+    )
+    expect(screen.getByText('Slide 1 content')).toBeInTheDocument()
+  })
+
+  it('shows an empty state when a topic has no slides', async () => {
+    studentContentMocks.getStudentTopicContent.mockResolvedValue({
+      ...topicContent,
+      slides: null,
+      upload: null,
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No slides for this topic',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('offers the original download when a presentation has no previews', async () => {
+    studentContentMocks.getStudentTopicContent.mockResolvedValue({
+      ...topicContent,
+      slides: null,
+      upload: { ...topicContent.upload, previews: [] },
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('button', { name: /download presentation/i }),
+    ).toBeInTheDocument()
   })
 
   it('asks anonymous visitors to sign in', async () => {

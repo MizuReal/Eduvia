@@ -18,6 +18,7 @@ and content. Web-only — there is no mobile client and no media transcoding pip
   Vitest + React Testing Library.
 - **Backend** — Node.js ESM, Express 5, strict TypeScript (NodeNext), Zod 4, Supabase JS,
   jose, pino, helmet, multer, file-type, mammoth, sharp, yauzl, sanitize-html, Vitest + Supertest.
+  Presentation previews also require LibreOffice (`soffice`) and Poppler (`pdftoppm`).
 - **Data** — Supabase Postgres, Auth, and Storage. Schema lives in `schemas/`.
 
 ## Commands
@@ -126,8 +127,9 @@ These are stated once, here. Every other section assumes them.
 - Quiz authoring: the **Quiz** tab offers native A–D question editing or a PDF/DOCX paper with an
   A–D answer key. Preview grading calls the server; never compute a score in the browser.
 - Enrollment: teachers share an invite link, choose approval or auto-accept, and manage a
-  roster. Students see only active subjects and a read-only topic/lesson table of contents.
-  Never expose lesson content or quizzes to students in this pass.
+  roster. Students see active subjects, a read-only topic/lesson table of contents, and each
+  topic's Tiptap slides or uploaded presentation previews. Never expose docs or quizzes in this
+  pass.
 - Quiz runner (deferred): autosave answers, support resume, show time remaining, confirm before
   submitting, never reveal answers before submission.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
@@ -180,6 +182,10 @@ These are stated once, here. Every other section assumes them.
 - Enrollment: every teacher action verifies course ownership; every student action derives the
   student id from the authenticated token. Enrollment mutations are idempotent and never trust a
   client-supplied status or student id.
+- Presentation previews: convert uploaded PPTX files to PDF with LibreOffice, render pages to
+  WebP with Poppler and `sharp`, and store them under the file's `previews/` prefix. Enforce a
+  200-slide cap, command timeouts, and temp-directory cleanup. Fail the upload without replacing
+  the previous presentation if preview generation fails.
 - All third-party calls originate here. No server-side fetching of user-supplied URLs (no SSRF).
 - Write admin actions, role changes, course and quiz publishing, unpublishes, quiz paper
   replacement/removal, quiz deletion, and content removals to `audit_logs`.
@@ -226,6 +232,7 @@ These are stated once, here. Every other section assumes them.
   store embedded image/file references as file ids, never signed URLs or base64 data.
 - Uploaded presentations keep the original file and a required summary. Replacing an upload
   creates a new file record and soft-deletes the previous file once the new file is ready.
+  Per-slide WebP previews are generated at upload and stored beside the original.
 - A quiz is either `native` (10–20 A–D multiple-choice questions authored in Eduvia) or
   `document` (a PDF/DOCX paper plus a numbered A–D answer key). Mode is fixed once created.
 - Native questions have one correct A–D option and duplicate options are rejected. Document
@@ -241,8 +248,9 @@ These are stated once, here. Every other section assumes them.
   `rejected`, or `removed`. Rejected and removed students may request again.
 - Removing a student revokes subject access immediately. Approval, rejection, and removal are
   restricted to the course owner.
-- Students see subject metadata and the ordered topics/lessons only. Lesson content, files, and
-  quizzes remain out of scope until the student runner lands.
+- Students see subject metadata, the ordered topics/lessons, and each topic's slides/presentation
+  previews. Docs, quizzes, and other lesson content remain out of scope until the student runner
+  lands.
 - Course text is stored as Tiptap JSON and rendered through the shared renderer or converted to
   sanitized HTML server-side. Raw client HTML is never rendered.
 - Students self-enroll through the subject invite link; enrollment is idempotent. Instructors
@@ -273,13 +281,13 @@ These are stated once, here. Every other section assumes them.
 - Frontend: Vitest + React Testing Library in jsdom. Suites live in `frontend/src/__tests__/`;
   setup and shared doubles in `frontend/src/test/`. Cover role-aware routing, form validation,
   upload states, slides editing, embedded image/file rendering, quiz authoring and preview
-  states, enrollment dashboard and invite flows, teacher roster actions, quiz runner timer and
-  resume behavior, and accessibility-critical interactions.
+  states, enrollment dashboard and invite flows, teacher roster actions, student topic slide
+  viewers, quiz runner timer and resume behavior, and accessibility-critical interactions.
 - Backend: Vitest + Supertest. Suites live in `backend/tests/*.test.ts`; env setup and fixtures in
   `backend/src/test/`. Cover auth middleware, role authorization, Zod validation, Tiptap content
   validation, embedded-file ownership, image/document validation, signed URL issuance, quiz
-  authoring and preview grading, enrollment approval/auto/removal, attempt snapshots, and
-  soft-delete behavior.
+  authoring and preview grading, enrollment approval/auto/removal, student topic slides,
+  presentation preview conversion, attempt snapshots, and soft-delete behavior.
 - Tests never touch a real Supabase project, storage, or the network. Mock
   `services/supabaseClient.ts`, `db/supabaseAdmin.ts`, storage calls, and `fetch`. Values come
   from committed `frontend/.env.test` and `backend/.env.test`; tests pass with no `.env` present.

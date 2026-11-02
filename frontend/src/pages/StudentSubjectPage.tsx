@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   CircleAlert,
   RefreshCw,
@@ -117,6 +118,14 @@ function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
                         ))}
                       </ol>
                     )}
+                    <Link
+                      to={`/student/subjects/${subject.id}/topics/${topic.id}`}
+                      className="mt-sm inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-primary transition-colors hover:text-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      aria-label={`Open ${topic.title}`}
+                    >
+                      Open topic
+                      <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
                   </div>
                 </div>
               </li>

@@ -9,10 +9,10 @@ management (`course_topics`, lesson entries, reordering, moving, and restore), t
 (a Tiptap slides editor, a Tiptap docs editor, an uploaded presentation, and embedded
 image/file assets), instructor quiz authoring (native A–D questions, an uploaded quiz paper
 with an A–D answer key, publish validation, and teacher-preview grading), and enrollment
-(invite links, approval or auto-accept, rosters, and read-only student subject pages), across
-migrations `001_profiles.sql` through `010_enrollment.sql`. Lesson content blocks, enrollment
-progress, and the student quiz runner below are the target contract — build them to this spec,
-not to an approximation of it.
+(invite links, approval or auto-accept, rosters, read-only student subject pages, and inline
+topic slide viewing), across migrations `001_profiles.sql` through `010_enrollment.sql`. Lesson
+content blocks, enrollment progress, and the student quiz runner below are the target contract —
+build them to this spec, not to an approximation of it.
 
 ---
 
@@ -63,6 +63,7 @@ GET    /api/enrollments/me                                   ✓ student-only
 GET    /api/enrollments/join/:courseId                        ✓ student-only
 POST   /api/enrollments                                       ✓ student-only
 GET    /api/student/subjects/:courseId                        ✓ student-only
+GET    /api/student/topics/:topicId/content                   ✓ student-only
 GET    /api/courses/:courseId/enrollments                     ✓ instructor-only
 PATCH  /api/courses/:courseId/enrollment-settings             ✓ instructor-only
 POST   /api/enrollments/:enrollmentId/approve                 ✓ instructor-only
@@ -118,9 +119,10 @@ PATCH  /api/admin/users/:userId/role
   "summary"?: string }`. Slides and docs accept `content`; the uploaded presentation accepts
   `summary`. At least one field is required.
 - `POST /api/topics/:topicId/presentations` is multipart with `file`, optional `title`, and
-  required `summary` (20–1,000 characters). It accepts `.pptx` and `.pdf` up to 25 MB. If an
-  uploaded presentation already exists, it replaces it transactionally; the previous file is
-  soft-deleted once the new file is ready.
+  required `summary` (20–1,000 characters). It accepts `.pptx` and `.pdf` up to 25 MB. Uploads
+  are converted to per-slide WebP previews before they become visible. If an uploaded
+  presentation already exists, it replaces it transactionally; the previous file is soft-deleted
+  once the new file is ready.
 - `POST /api/content/:contentId/assets` is multipart with `file` and `kind` (`image` or `file`).
   Images accept JPG, PNG, and WebP up to 10 MB; embedded files accept PDF, DOCX, PPTX, TXT, and
   MD up to 25 MB.
@@ -163,6 +165,9 @@ PATCH  /api/admin/users/:userId/role
   `approval` mode. A closed subject returns `409 ENROLLMENT_CLOSED`.
 - `GET /api/student/subjects/:courseId` returns subject metadata plus the ordered topics and
   lesson titles. It returns 404 unless the student has an active enrollment.
+- `GET /api/student/topics/:topicId/content` returns the topic's Tiptap slides and uploaded
+  presentation previews with short-lived signed URLs. It returns 404 unless the student has an
+  active enrollment in the topic's course. Docs are omitted.
 - `GET /api/courses/:courseId/enrollments` returns enrollment settings, pending requests, and
   the active roster. `PATCH /api/courses/:courseId/enrollment-settings` accepts
   `{ "open": boolean, "mode": "approval" | "auto" }`.
@@ -204,7 +209,8 @@ no separate content list and no separate slides entity.
   are no longer referenced. The storage object is not deleted immediately; storage cleanup
   remains a separate idempotent job.
 - Replacing an uploaded presentation creates a new file record and soft-deletes the previous
-  file after the new file is ready.
+  file after the new file is ready. Per-slide WebP previews are generated during upload and
+  stored under the new file's `previews/` prefix.
 - Deleting a content item soft-deletes it and all of its embedded assets or its uploaded
   presentation file, and writes an `audit_logs` entry.
 
@@ -267,17 +273,21 @@ States: `uploading`, `processing`, `ready`, `failed`, `quarantined`.
 | `.jpg/.jpeg/.png/.webp` | Inline preview                                                 |
 | `.txt`, `.md`   | Rendered as plain text                                                 |
 | `.docx`         | Converted to sanitized HTML with `mammoth`                             |
-| `.pptx`         | Download only in v1                                                    |
+| `.pptx`         | Converted to per-slide WebP images with LibreOffice and Poppler        |
 | `.mp4`, `.webm` | Native player via short-lived signed URL and storage range requests    |
 
 `.docx` conversion enforces ZIP entry count, uncompressed size, and a conversion timeout before
-parsing. Everything that is not previewable is served with `Content-Disposition: attachment`.
+parsing. Presentation previews require LibreOffice (`soffice`) and Poppler (`pdftoppm`) on the
+backend host. Everything that is not previewable is served with `Content-Disposition: attachment`.
 Storage paths are not exposed in public API responses when a signed URL is sufficient.
 
-Uploaded presentations are download-only attachments in v1 with a required summary. The PPTX tab
-is a native Tiptap slides editor; uploaded PPTX files are never edited or round-tripped.
-Embedded file attachments inside docs and slides open through a fresh signed URL; images render
-inline.
+Uploaded presentations keep the original file and a required summary. At upload time, PPTX files
+are converted to PDF with LibreOffice and both PPTX/PDF inputs are rasterized to per-slide WebP
+images with `pdftoppm` and `sharp`. The original is never edited or round-tripped and remains
+downloadable. Previews are stored beside the original under the file's `previews/` prefix and
+are limited to 200 slides. The PPTX tab is a native Tiptap slides editor; uploaded PPTX files are
+never edited. Embedded file attachments inside docs and slides open through a fresh signed URL;
+images render inline.
 
 ### Video
 
@@ -376,8 +386,9 @@ Every subject has one enrollment setting and at most one enrollment row per stud
 - **Removal** — a teacher removes a student by setting the row to `removed`. Access to the
   subject and its table of contents ends immediately.
 - **Student dashboard** — `/student` lists active subjects and pending requests.
-  `/student/subjects/{courseId}` shows subject metadata, ordered topics, and lesson titles only;
-  it does not expose lesson content, files, or quizzes.
+  `/student/subjects/{courseId}` shows subject metadata, ordered topics, and lesson titles.
+  `/student/subjects/{courseId}/topics/{topicId}` shows the topic's Tiptap slides or uploaded
+  presentation previews. It does not expose docs, files, or quizzes.
 - **Teacher roster** — `/teacher/subjects/{courseId}/students` shows the invite link, enrollment
   switch, mode, pending requests, and enrolled students. Approve, reject, and remove actions
   verify course ownership.

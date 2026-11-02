@@ -37,6 +37,23 @@ export function buildStoragePath(
   return `courses/${courseId}/${fileId}/${filename}`
 }
 
+export function presentationPreviewPrefix(
+  courseId: string,
+  fileId: string,
+): string {
+  return `courses/${courseId}/${fileId}/previews`
+}
+
+export function buildPresentationPreviewPath(
+  courseId: string,
+  fileId: string,
+  pageNumber: number,
+): string {
+  return `${presentationPreviewPrefix(courseId, fileId)}/slide-${String(
+    pageNumber,
+  ).padStart(4, '0')}.webp`
+}
+
 export function calculateChecksum(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex')
 }

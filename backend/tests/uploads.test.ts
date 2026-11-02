@@ -39,6 +39,9 @@ const { mocks, validateUploadedFileMock, toTopicFileMock } = vi.hoisted(() => {
     insertFile: vi.fn(),
     listFilesForContent: vi.fn(),
     removeCourseFile: vi.fn(),
+    removeCourseFiles: vi.fn(),
+    listCourseFilePaths: vi.fn(),
+    renderPresentationPreviews: vi.fn(),
     sumActiveFileBytesForUser: vi.fn(),
     uploadCourseFile: vi.fn(),
   }
@@ -54,6 +57,7 @@ vi.mock('../src/db/courseOutline.js', () => ({
   findDeletedLessonForInstructor: vi.fn(),
   findDeletedTopicForInstructor: vi.fn(),
   findLessonForInstructor: vi.fn(),
+  findTopicById: vi.fn(),
   findTopicForCourse: vi.fn(),
   findTopicForInstructor: mocks.findTopicForInstructor,
   getCourseTrash: vi.fn(),
@@ -109,8 +113,14 @@ vi.mock('../src/db/files.js', () => ({
 vi.mock('../src/storage/courseFiles.js', () => ({
   createSignedUrlForCourseFile: mocks.createSignedUrlForCourseFile,
   createSignedUrlsForCourseFiles: mocks.createSignedUrlsForCourseFiles,
+  listCourseFilePaths: mocks.listCourseFilePaths,
   removeCourseFile: mocks.removeCourseFile,
+  removeCourseFiles: mocks.removeCourseFiles,
   uploadCourseFile: mocks.uploadCourseFile,
+}))
+
+vi.mock('../src/services/presentationPreviewService.js', () => ({
+  renderPresentationPreviews: mocks.renderPresentationPreviews,
 }))
 
 vi.mock('../src/services/uploadService.js', () => ({
@@ -213,6 +223,16 @@ describe('content uploads', () => {
     mocks.findTopicForInstructor.mockResolvedValue(topic)
     mocks.uploadCourseFile.mockResolvedValue(undefined)
     mocks.removeCourseFile.mockResolvedValue(undefined)
+    mocks.removeCourseFiles.mockResolvedValue(undefined)
+    mocks.listCourseFilePaths.mockResolvedValue([])
+    mocks.renderPresentationPreviews.mockResolvedValue([
+      {
+        pageNumber: 1,
+        buffer: Buffer.from('preview'),
+        width: 1600,
+        height: 900,
+      },
+    ])
     mocks.sumActiveFileBytesForUser.mockResolvedValue(0)
     mocks.upsertPresentationRecord.mockResolvedValue({
       contentId: presentationRow.id,
@@ -265,7 +285,12 @@ describe('content uploads', () => {
       .attach('file', Buffer.from('mock pptx'), 'week-1.pptx')
 
     expect(response.status).toBe(201)
-    expect(mocks.uploadCourseFile).toHaveBeenCalled()
+    expect(mocks.renderPresentationPreviews).toHaveBeenCalled()
+    expect(mocks.uploadCourseFile).toHaveBeenCalledWith(
+      expect.stringContaining('/previews/slide-0001.webp'),
+      expect.any(Buffer),
+      'image/webp',
+    )
     expect(mocks.upsertPresentationRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         courseId,

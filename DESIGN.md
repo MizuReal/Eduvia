@@ -485,6 +485,12 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 **`student-toc`** — Read-only subject table of contents
 - Topics use numbered `{colors.canvas-soft}` markers and `{typography.title}` headings. Lessons sit on a `{colors.hairline}` left rule in `{typography.body-sm}`. The surface is read-only: no editor chrome, drag handles, or management actions.
 
+**`student-slide-viewer`** — Uploaded and created slide player
+- The slide sits in a `{colors.canvas-soft}` well with a `{colors.surface}` frame, `{colors.hairline}` border, `{rounded.lg}` corners, and `{shadow.soft}`. Images use `object-contain` against the slide surface; Tiptap slides reuse the existing slide renderer. Previous/Next controls are 44px utility buttons, the counter uses `{typography.caption}` with `aria-live`, and the viewer never autoplays.
+
+**`presentation-source-tabs`** — Uploaded vs created slides
+- Two pill buttons above the viewer. The selected source uses `{colors.primary}` with `{colors.on-primary}` text; the other uses the utility surface. The group only appears when both an uploaded presentation and a Tiptap slide deck exist.
+
 ### Signature Components
 
 **`hero-band`** — Dark "night" hero

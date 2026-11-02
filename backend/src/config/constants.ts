@@ -38,6 +38,16 @@ export const PRESENTATION_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ] as const
+export const PRESENTATION_PREVIEW_MAX_PAGES = 200
+export const PRESENTATION_PREVIEW_DPI = 120
+export const PRESENTATION_PREVIEW_MAX_WIDTH = 1600
+export const PRESENTATION_PREVIEW_QUALITY = 80
+export const PRESENTATION_PREVIEW_TIMEOUT_MS = 60_000
+export const PRESENTATION_PREVIEW_MIME_TYPE = 'image/webp'
+export const SOFFICE_BIN = 'soffice'
+export const PDFTOPPM_BIN = 'pdftoppm'
+export const PPTX_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 
 export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'] as const
 export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const

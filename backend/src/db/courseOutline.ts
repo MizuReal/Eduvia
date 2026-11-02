@@ -210,6 +210,28 @@ export async function findTopicForCourse(
   return data
 }
 
+export async function findTopicById(
+  topicId: string,
+): Promise<TopicLookupRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from('course_topics')
+    .select(TOPIC_LOOKUP_COLUMNS)
+    .eq('id', topicId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) {
+    logger.error({ err: error, topicId }, 'Topic lookup failed')
+    throw new AppError(
+      503,
+      'TOPIC_LOOKUP_FAILED',
+      'We could not load that topic. Try again.',
+    )
+  }
+
+  return data ?? null
+}
+
 export async function findTopicForInstructor(
   topicId: string,
   instructorId: string,
