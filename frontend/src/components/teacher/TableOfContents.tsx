@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import clsx from 'clsx'
 import {
+  BarChart3,
   BookOpen,
   ChevronDown,
   ChevronUp,
@@ -84,6 +85,7 @@ type TopicCardProps = {
   onDeleteTopic: (topic: CourseTopic) => void
   onManageContent: (topic: CourseTopic) => void
   onMakeQuiz: (topic: CourseTopic) => void
+  onViewResults: (topic: CourseTopic) => void
   onMoveLesson: (topicId: string, lesson: Lesson, offset: number) => void
   onEditLesson: (topicId: string, lesson: Lesson) => void
   onDeleteLesson: (topicId: string, lesson: Lesson) => void
@@ -98,6 +100,7 @@ function TopicCard({
   onDeleteTopic,
   onManageContent,
   onMakeQuiz,
+  onViewResults,
   onMoveLesson,
   onEditLesson,
   onDeleteLesson,
@@ -168,6 +171,14 @@ function TopicCard({
               >
                 <ListChecks className="size-4" aria-hidden="true" />
                 Make a quiz
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewResults(topic)}
+                className="inline-flex min-h-11 items-center gap-xxs rounded-full border border-hairline bg-surface px-md text-body-sm font-medium text-ink transition-colors hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <BarChart3 className="size-4" aria-hidden="true" />
+                Results
               </button>
               <IconActionButton
                 label={`Move topic ${topic.title} up`}
@@ -324,6 +335,7 @@ type TableOfContentsProps = {
   onDeleteTopic: (topic: CourseTopic) => void
   onManageContent: (topic: CourseTopic) => void
   onMakeQuiz: (topic: CourseTopic) => void
+  onViewResults: (topic: CourseTopic) => void
   onMoveLesson: (topicId: string, lesson: Lesson, offset: number) => void
   onEditLesson: (topicId: string, lesson: Lesson) => void
   onDeleteLesson: (topicId: string, lesson: Lesson) => void
@@ -338,6 +350,7 @@ export function TableOfContents({
   onDeleteTopic,
   onManageContent,
   onMakeQuiz,
+  onViewResults,
   onMoveLesson,
   onEditLesson,
   onDeleteLesson,
@@ -464,6 +477,7 @@ export function TableOfContents({
                   onDeleteTopic={onDeleteTopic}
                   onManageContent={onManageContent}
                   onMakeQuiz={onMakeQuiz}
+                  onViewResults={onViewResults}
                   onMoveLesson={onMoveLesson}
                   onEditLesson={onEditLesson}
                   onDeleteLesson={onDeleteLesson}

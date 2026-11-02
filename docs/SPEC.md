@@ -80,6 +80,8 @@ PUT    /api/quizzes/:quizId                                   ✓ instructor-onl
 DELETE /api/quizzes/:quizId                                   ✓ instructor-only
 POST   /api/quizzes/:quizId/publish                           ✓ instructor-only
 POST   /api/quizzes/:quizId/preview-grade                     ✓ instructor-only
+GET    /api/topics/:topicId/quiz/results                       ✓ instructor-only
+GET    /api/courses/:courseId/students/:studentId/quiz-results ✓ instructor-only
 POST   /api/quizzes/:quizId/paper                             ✓ instructor-only
 DELETE /api/quizzes/:quizId/paper                             ✓ instructor-only
 
@@ -354,6 +356,23 @@ quiz's passing score, and per-question correctness. Preview attempts are never p
 Correct options and explanations are teacher-authoring data. They are never included in any
 student-facing response before submission.
 
+### Teacher results
+
+- `GET /api/topics/:topicId/quiz/results` returns the topic and quiz metadata plus one row per
+  **active** enrolled student. Each row summarises that student's best graded attempt: score,
+  maximum score, percentage, pass/fail, attempt count, and last submission. Students without a
+  graded attempt remain in the list with status `not_taken`. Pending, rejected, and removed
+  students are excluded.
+- `GET /api/courses/:courseId/students/:studentId/quiz-results` returns every published quiz in
+  the subject, in topic order, with the same best-attempt summary for one student. Quizzes
+  without a graded attempt show `not_taken`.
+- “Best” means the highest percentage; ties go to the most recent attempt. Grading still reads
+  only the attempt snapshot, so historical results survive later quiz edits and republishes.
+- These endpoints are instructor-only and verify course ownership plus enrollment in the
+  service. They never include correct option ids, accepted answers, explanations, or scoring
+  keys. The teacher UI renders the summaries in sortable datatables and exports the current
+  order as CSV or through the browser's print-to-PDF dialog.
+
 ### Paper previews
 
 | Type    | Treatment                                                        |
@@ -411,7 +430,11 @@ Every subject has one enrollment setting and at most one enrollment row per stud
   teacher-authoring data remain hidden.
 - **Teacher roster** — `/teacher/subjects/{courseId}/students` shows the invite link, enrollment
   switch, mode, pending requests, and enrolled students. Approve, reject, and remove actions
-  verify course ownership.
+  verify course ownership. Each active student links to their subject-wide quiz results at
+  `/teacher/subjects/{courseId}/students/{studentId}/results`.
+- **Teacher quiz results** — `/teacher/subjects/{courseId}/topics/{topicId}/results` shows every
+  active student's best graded attempt for that topic's quiz. Both result pages are sortable and
+  export the current order as CSV or a print-to-PDF document.
 
 ---
 

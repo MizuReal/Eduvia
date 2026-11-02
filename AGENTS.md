@@ -15,7 +15,7 @@ and content. Web-only — there is no mobile client and no media transcoding pip
 
 - **Frontend** — React 19, Vite 8, Tailwind CSS v4 (`@tailwindcss/vite`), React Router 6,
   react-hook-form + Zod, Tiptap 3, react-dropzone, `@dnd-kit` sortable controls,
-  Vitest + React Testing Library.
+  `@tanstack/react-table` for result summaries, Vitest + React Testing Library.
 - **Backend** — Node.js ESM, Express 5, strict TypeScript (NodeNext), Zod 4, Supabase JS,
   jose, pino, helmet, multer, file-type, mammoth, sharp, yauzl, sanitize-html, Vitest + Supertest.
   Presentation previews also require LibreOffice (`soffice`) and Poppler (`pdftoppm`).
@@ -134,6 +134,10 @@ These are stated once, here. Every other section assumes them.
   reveal answers before submission, and show a pass congratulation with a review after passing.
   Failed attempts show the score and retry action but never reveal correct answers. There is no
   timer because quizzes have no time-limit setting.
+- Teacher quiz results: sortable datatables for a topic's full roster (every active student,
+  including “Not taken”) and for one student's published quizzes across the subject. Default the
+  student view to highest percentage first. Export the current order as CSV or through the
+  browser print dialog (Save as PDF); never compute grades in the browser.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
 - Styling: Tailwind utilities composed from `DESIGN.md` tokens. No CSS modules, no CSS-in-JS.
@@ -254,6 +258,10 @@ These are stated once, here. Every other section assumes them.
   content, progress, and quiz routes.
 - Failed quizzes may be retried; passed quizzes cannot be retaken. Passing a topic unlocks the
   next topic immediately.
+- Teacher result summaries read the best graded attempt per student and quiz (highest
+  percentage, latest on a tie). The topic summary lists every active enrolled student, including
+  “Not taken”; the student summary lists every published quiz across the subject's topics.
+  Results never expose correct answers and are read-only.
 - A subject has one enrollment setting: open or closed, with `approval` or `auto` mode. New
   subjects start closed and require approval.
 - One enrollment row exists per `(course_id, student_id)` with status `pending`, `active`,

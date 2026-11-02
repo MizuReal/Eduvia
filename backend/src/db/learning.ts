@@ -1,14 +1,8 @@
 import { AppError } from '../errors/AppError.js'
 import { logger } from '../logger.js'
-import type {
-  QuizAttemptRow,
-  TopicProgressRow,
-} from './database.types.js'
+import type { QuizAttemptRow, TopicProgressRow } from './database.types.js'
 import type { CorrectOption } from '../types/quiz.js'
-import type {
-  AttemptAnswer,
-  AttemptSnapshot,
-} from '../types/learning.js'
+import type { AttemptAnswer, AttemptSnapshot } from '../types/learning.js'
 import { supabaseAdmin } from './supabaseAdmin.js'
 
 const PROGRESS_COLUMNS =
@@ -18,6 +12,8 @@ const ATTEMPT_COLUMNS =
   'id, quiz_id, course_id, topic_id, student_id, attempt_number, status, snapshot, score, max_score, percentage, passed, started_at, submitted_at, graded_at, created_at, updated_at'
 const ATTEMPT_SUMMARY_COLUMNS =
   'quiz_id, attempt_number, status, passed, percentage, graded_at'
+const RESULT_ATTEMPT_COLUMNS =
+  'id, quiz_id, course_id, topic_id, student_id, attempt_number, score, max_score, percentage, passed, submitted_at, graded_at'
 
 const ANSWER_COLUMNS =
   'id, attempt_id, question_id, selected_option, is_correct, points_awarded, created_at, updated_at'
@@ -109,6 +105,21 @@ export type AttemptSummaryRecord = {
   gradedAt: string | null
 }
 
+export type QuizResultAttemptRecord = {
+  id: string
+  quizId: string
+  courseId: string
+  topicId: string
+  studentId: string
+  attemptNumber: number
+  score: number | null
+  maxScore: number | null
+  percentage: number | null
+  passed: boolean | null
+  submittedAt: string | null
+  gradedAt: string | null
+}
+
 export type AttemptAnswerRecord = AttemptAnswer & {
   isCorrect: boolean | null
   pointsAwarded: number | null
@@ -162,6 +173,38 @@ function toAnswer(row: AttemptAnswerSelectRow): AttemptAnswerRecord {
   }
 }
 
+function toResultAttempt(row: {
+  id: string
+  quiz_id: string
+  course_id: string
+  topic_id: string
+  student_id: string
+  attempt_number: number
+  score: number | null
+  max_score: number | null
+  percentage: number | null
+  passed: boolean | null
+  submitted_at: string | null
+  graded_at: string | null
+}): QuizResultAttemptRecord {
+  return {
+    id: row.id,
+    quizId: row.quiz_id,
+    courseId: row.course_id,
+    topicId: row.topic_id,
+    studentId: row.student_id,
+    attemptNumber: row.attempt_number,
+    score: row.score,
+    maxScore: row.max_score,
+    percentage: row.percentage,
+    passed: row.passed,
+    submittedAt: row.submitted_at
+      ? new Date(row.submitted_at).toISOString()
+      : null,
+    gradedAt: row.graded_at ? new Date(row.graded_at).toISOString() : null,
+  }
+}
+
 export async function findTopicProgress(
   topicId: string,
   studentId: string,
@@ -174,7 +217,10 @@ export async function findTopicProgress(
     .maybeSingle()
 
   if (error) {
-    logger.error({ err: error, topicId, studentId }, 'Topic progress lookup failed')
+    logger.error(
+      { err: error, topicId, studentId },
+      'Topic progress lookup failed',
+    )
     throw new AppError(
       503,
       'PROGRESS_LOAD_FAILED',
@@ -196,7 +242,10 @@ export async function listTopicProgressForCourse(
     .eq('student_id', studentId)
 
   if (error) {
-    logger.error({ err: error, courseId, studentId }, 'Course progress load failed')
+    logger.error(
+      { err: error, courseId, studentId },
+      'Course progress load failed',
+    )
     throw new AppError(
       503,
       'PROGRESS_LOAD_FAILED',
@@ -274,6 +323,55 @@ export async function listAttemptSummariesForStudentCourse(
   }))
 }
 
+export async function listGradedAttemptsForQuiz(
+  quizId: string,
+): Promise<QuizResultAttemptRecord[]> {
+  const { data, error } = await supabaseAdmin
+    .from('quiz_attempts')
+    .select(RESULT_ATTEMPT_COLUMNS)
+    .eq('quiz_id', quizId)
+    .eq('status', 'graded')
+    .order('attempt_number', { ascending: false })
+
+  if (error) {
+    logger.error({ err: error, quizId }, 'Quiz result attempts load failed')
+    throw new AppError(
+      503,
+      'RESULTS_LOAD_FAILED',
+      'We could not load this quiz’s results. Try again.',
+    )
+  }
+
+  return (data ?? []).map(toResultAttempt)
+}
+
+export async function listGradedAttemptsForStudentCourse(
+  courseId: string,
+  studentId: string,
+): Promise<QuizResultAttemptRecord[]> {
+  const { data, error } = await supabaseAdmin
+    .from('quiz_attempts')
+    .select(RESULT_ATTEMPT_COLUMNS)
+    .eq('course_id', courseId)
+    .eq('student_id', studentId)
+    .eq('status', 'graded')
+    .order('attempt_number', { ascending: false })
+
+  if (error) {
+    logger.error(
+      { err: error, courseId, studentId },
+      'Student quiz result attempts load failed',
+    )
+    throw new AppError(
+      503,
+      'RESULTS_LOAD_FAILED',
+      'We could not load this student’s quiz results. Try again.',
+    )
+  }
+
+  return (data ?? []).map(toResultAttempt)
+}
+
 export async function findLatestAttempt(
   quizId: string,
   studentId: string,
@@ -288,7 +386,10 @@ export async function findLatestAttempt(
     .maybeSingle()
 
   if (error) {
-    logger.error({ err: error, quizId, studentId }, 'Latest attempt load failed')
+    logger.error(
+      { err: error, quizId, studentId },
+      'Latest attempt load failed',
+    )
     throw new AppError(
       503,
       'ATTEMPT_LOAD_FAILED',

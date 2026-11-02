@@ -139,7 +139,7 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-hairline bg-canvas">
+    <header className="sticky top-0 z-40 border-b border-hairline bg-canvas print:hidden">
       <Container className="flex items-center justify-between gap-md py-sm">
         <Link
           to="/"

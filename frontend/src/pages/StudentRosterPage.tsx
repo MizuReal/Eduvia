@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft,
+  BarChart3,
   Check,
   CircleAlert,
   Copy,
@@ -17,6 +18,7 @@ import { ConfirmDialog } from '../components/content/ConfirmDialog'
 import { FormAlert } from '../components/auth/FormAlert'
 import { TeacherAccessGate } from '../components/teacher/TeacherAccessGate'
 import { Button } from '../components/ui/Button'
+import { buttonClasses } from '../components/ui/buttonStyles'
 import {
   ENROLLMENT_MODE_OPTIONS,
   courseTermLabel,
@@ -218,12 +220,14 @@ function SettingsCard({
 function StudentRow({
   enrollment,
   action,
+  resultsHref,
   onApprove,
   onReject,
   onRemove,
 }: {
   enrollment: CourseEnrollment
   action: 'approve' | 'reject' | 'remove' | null
+  resultsHref: string | null
   onApprove: () => void
   onReject: () => void
   onRemove: () => void
@@ -261,14 +265,22 @@ function StudentRow({
             </Button>
           </>
         ) : (
-          <Button
-            variant="utility"
-            onClick={onRemove}
-            disabled={action !== null}
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-            Remove
-          </Button>
+          <>
+            {resultsHref && (
+              <Link to={resultsHref} className={buttonClasses('utility')}>
+                <BarChart3 className="size-4" aria-hidden="true" />
+                Results
+              </Link>
+            )}
+            <Button
+              variant="utility"
+              onClick={onRemove}
+              disabled={action !== null}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Remove
+            </Button>
+          </>
         )}
       </div>
     </li>
@@ -449,6 +461,7 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
                               ? 'approve'
                               : null
                           }
+                          resultsHref={null}
                           onApprove={() =>
                             void runAction(enrollment.id, () =>
                               approveEnrollment(enrollment.id, accessToken ?? ''),
@@ -501,6 +514,11 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
                         enrollment={enrollment}
                         action={
                           busyEnrollment === enrollment.id ? 'remove' : null
+                        }
+                        resultsHref={
+                          courseId
+                            ? `/teacher/subjects/${courseId}/students/${enrollment.studentId}/results`
+                            : null
                         }
                         onApprove={() => undefined}
                         onReject={() => undefined}

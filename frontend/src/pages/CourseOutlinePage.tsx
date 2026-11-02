@@ -534,6 +534,14 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
     }
   }
 
+  const openTopicResults = (topic: CourseTopic) => {
+    clearActionFeedback()
+
+    if (courseId) {
+      navigate(`/teacher/subjects/${courseId}/topics/${topic.id}/results`)
+    }
+  }
+
   return (
     <section
       aria-labelledby="course-outline-heading"
@@ -631,6 +639,7 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
                 onMakeQuiz={(topic) => {
                   openTopic(topic, 'quiz')
                 }}
+                onViewResults={openTopicResults}
                 onMoveLesson={handleMoveLesson}
                 onEditLesson={(topicId, lesson) => {
                   clearActionFeedback()

@@ -171,6 +171,22 @@ describe('StudentRosterPage', () => {
     })
   })
 
+  it('links enrolled students to their quiz results', async () => {
+    renderRoster()
+
+    const activeSection = await screen.findByRole('region', {
+      name: 'Enrolled students',
+    })
+    const resultsLink = within(activeSection).getByRole('link', {
+      name: 'Results',
+    })
+
+    expect(resultsLink).toHaveAttribute(
+      'href',
+      `/teacher/subjects/${courseId}/students/student-1/results`,
+    )
+  })
+
   it('removes an enrolled student', async () => {
     const user = userEvent.setup()
     renderRoster()

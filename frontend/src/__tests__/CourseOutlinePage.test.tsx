@@ -156,6 +156,10 @@ function renderPage() {
           path="/teacher/subjects/:courseId/topics/:topicId"
           element={<LocationProbe />}
         />
+        <Route
+          path="/teacher/subjects/:courseId/topics/:topicId/results"
+          element={<LocationProbe />}
+        />
       </Routes>
     </MemoryRouter>,
   )
@@ -211,7 +215,7 @@ describe('CourseOutlinePage', () => {
     expect(within(tableOfContents).getByText('1 lesson')).toBeInTheDocument()
   })
 
-  it('shows prominent manage content and quiz actions for each topic', async () => {
+  it('shows prominent manage content, quiz, and results actions for each topic', async () => {
     renderPage()
 
     const tableOfContents = await screen.findByRole('region', {
@@ -228,6 +232,30 @@ describe('CourseOutlinePage', () => {
         name: 'Make a quiz',
       }),
     ).toHaveLength(1)
+    expect(
+      within(tableOfContents).getAllByRole('button', {
+        name: 'Results',
+      }),
+    ).toHaveLength(1)
+  })
+
+  it('opens the results summary from the topic results action', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const tableOfContents = await screen.findByRole('region', {
+      name: 'Table of contents',
+    })
+
+    await user.click(
+      within(tableOfContents).getByRole('button', { name: 'Results' }),
+    )
+
+    expect(
+      await screen.findByText(
+        `/teacher/subjects/${courseId}/topics/${topicId}/results`,
+      ),
+    ).toBeInTheDocument()
   })
 
   it('opens the quiz tab from the make a quiz action', async () => {
