@@ -1,4 +1,4 @@
-# Deploying Eduvia: Vercel + Google Cloud Run
+# Deploying Eduvia: Vercel + Render
 
 Eduvia deploys as three pieces:
 
@@ -7,13 +7,13 @@ Vercel (static React SPA)
         |
         | HTTPS / JWT
         v
-Google Cloud Run (Dockerized Express API)
+Render (Dockerized Express API)
         |
         v
 Supabase (Postgres + Auth + private Storage)
 ```
 
-Cloud Run is used instead of Render Free because presentation previews need LibreOffice and Poppler, and Render Free only provides 512 MB RAM / 0.1 CPU. Cloud Run can run the same Docker image with 2 GiB RAM and scales to zero when idle.
+The backend runs from `backend/Dockerfile`, which installs LibreOffice Impress and Poppler for presentation previews.
 
 > Complete [setup.md](./setup.md) first. This guide assumes the Supabase project is already migrated.
 
@@ -22,9 +22,10 @@ Cloud Run is used instead of Render Free because presentation previews need Libr
 - GitHub repository containing this project
 - Supabase project with migrations `001`–`014` applied
 - Vercel account
-- Google Cloud account with billing enabled
-- `gcloud` CLI installed and authenticated
-- `Docker` is not required locally; Cloud Build builds the image
+- Render account
+- A Render plan chosen:
+  - **Free** — 512 MB RAM / 0.1 CPU; core flows work, but PPTX preview generation may fail
+  - **Paid 2 GB plan** — 1 CPU / 2 GB RAM; recommended for reliable presentation previews
 
 ## Included deployment files
 
@@ -38,137 +39,92 @@ From Supabase **Project Settings → API**, collect:
 
 - Project URL, for example `https://abcdefgh.supabase.co`
 - Publishable / anon key for Vercel
-- Service-role / secret key for Cloud Run only
+- Service-role / secret key for Render only
 
 For a new Supabase project using JWT signing keys, leave `SUPABASE_JWT_SECRET` unset. Only legacy HS256 projects need it.
 
-## 2. Set up Google Cloud
+## 2. Create the Render web service
 
-Set shell values for your project and nearest region:
+1. Sign in to Render and choose **New → Web Service**.
+2. Connect the GitHub repository.
+3. Set:
+   - **Name:** `eduvia-api`
+   - **Region:** the closest region to your Supabase project and users, for example Singapore
+   - **Branch:** `main`
+   - **Root Directory:** `backend`
+   - **Language:** Docker
+   - **Dockerfile Path:** `Dockerfile`
+   - **Auto-Deploy:** Yes
+4. Choose a compute plan:
+   - **Free** for a demo or for testing core flows.
+   - The paid **`1c-2g`** plan (1 CPU / 2 GB RAM) for reliable LibreOffice conversion.
+5. Add the environment variables below.
+6. Leave the health check path blank unless you add a dedicated health endpoint.
+7. Create the service.
 
-```bash
-export PROJECT_ID="your-google-cloud-project-id"
-export REGION="asia-southeast1"
-export REPO="eduvia"
-export IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:latest"
+Render builds `backend/Dockerfile` and starts `node dist/server.js` from the image. Do not set a start command or build command; the Dockerfile supplies them.
+
+## 3. Render environment variables
+
+Add these under **Environment**:
+
+```text
+NODE_ENV=production
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+TRUST_PROXY_HOPS=3
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-or-secret-key
+TEACHER_REGISTRATION_CODE=use-at-least-16-characters
+LOG_LEVEL=info
 ```
 
-Enable the required APIs:
+Optional values:
 
-```bash
-gcloud config set project "$PROJECT_ID"
+```text
+# Legacy HS256 Supabase projects only.
+# SUPABASE_JWT_SECRET=your-legacy-jwt-secret
 
-gcloud services enable \
-  run.googleapis.com \
-  artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com \
-  secretmanager.googleapis.com
+# Override upload/storage defaults only if needed.
+# UPLOAD_TEMP_DIR=/tmp/eduvia-uploads
+# DOCUMENT_MAX_BYTES=26214400
+# IMAGE_MAX_BYTES=10485760
+# USER_STORAGE_QUOTA_BYTES=262144000
+# SIGNED_URL_TTL_SECONDS=300
+# UPLOAD_RATE_LIMIT_WINDOW_MS=900000
+# UPLOAD_RATE_LIMIT_MAX=30
 ```
 
-Create the Artifact Registry repository:
+Store `SUPABASE_SERVICE_ROLE_KEY` and `TEACHER_REGISTRATION_CODE` only in Render's environment settings. Never commit them or paste them into logs. If you do not want teacher self-registration, omit `TEACHER_REGISTRATION_CODE`.
 
-```bash
-gcloud artifacts repositories create "$REPO" \
-  --repository-format=docker \
-  --location="$REGION" \
-  --description="Eduvia containers"
-```
-
-Create a dedicated runtime service account and allow it to read secrets:
-
-```bash
-gcloud iam service-accounts create eduvia-run \
-  --display-name="Eduvia Cloud Run"
-
-export RUN_SA="eduvia-run@$PROJECT_ID.iam.gserviceaccount.com"
-```
-
-## 3. Create Cloud Run secrets
-
-Create the service-role secret. Replace the placeholder without committing the key; the Secret Manager console is also fine:
-
-```bash
-printf '%s' 'replace-with-supabase-service-role-key' \
-  | gcloud secrets create supabase-service-role-key --data-file=-
-```
-
-Create the teacher registration code secret. It must be at least 16 characters:
-
-```bash
-printf '%s' 'replace-with-a-16-plus-character-code' \
-  | gcloud secrets create teacher-registration-code --data-file=-
-```
-
-Allow the runtime account to read them:
-
-```bash
-for secret in supabase-service-role-key teacher-registration-code; do
-  gcloud secrets add-iam-policy-binding "$secret" \
-    --member="serviceAccount:$RUN_SA" \
-    --role="roles/secretmanager.secretAccessor"
-done
-```
-
-If you use a legacy HS256 Supabase project, create `supabase-jwt-secret` the same way and add `--set-secrets "SUPABASE_JWT_SECRET=supabase-jwt-secret:latest"` to the deploy command.
-
-## 4. Build and push the backend image
-
-From the repository root:
-
-```bash
-gcloud builds submit --tag "$IMAGE" ./backend
-```
-
-The Docker build installs `libreoffice-impress` and `poppler-utils`; the image is large, so the first build takes a few minutes.
-
-## 5. Deploy the backend to Cloud Run
-
-Deploy with 2 GiB RAM and one request at a time so LibreOffice conversions do not compete for memory:
-
-```bash
-gcloud run deploy eduvia-api \
-  --image "$IMAGE" \
-  --region "$REGION" \
-  --service-account "$RUN_SA" \
-  --allow-unauthenticated \
-  --port 8080 \
-  --memory 2Gi \
-  --cpu 1 \
-  --concurrency 1 \
-  --timeout 300 \
-  --min-instances 0 \
-  --max-instances 2 \
-  --set-env-vars "NODE_ENV=production,CORS_ALLOWED_ORIGINS=http://localhost:5173,SUPABASE_URL=https://your-project-ref.supabase.co,LOG_LEVEL=info" \
-  --set-secrets "SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,TEACHER_REGISTRATION_CODE=teacher-registration-code:latest"
-```
+Do not add a `PORT` variable in Render. Render injects it (10000 by default) and the API reads it at startup; the Dockerfile's `8080` value is only a container default and is overridden.
 
 Notes:
 
-- `--allow-unauthenticated` makes the API reachable; application routes still enforce Supabase JWTs and roles.
 - `CORS_ALLOWED_ORIGINS` is temporary until the Vercel URL exists.
-- Cloud Run supplies `PORT`; do not override it.
-- `UPLOAD_TEMP_DIR` is set to `/tmp/eduvia-uploads` by the Dockerfile. Cloud Run storage is ephemeral; uploaded files are streamed to Supabase Storage.
-- If you do not want teacher self-registration, omit the `TEACHER_REGISTRATION_CODE` entry from `--set-secrets`.
+- `TRUST_PROXY_HOPS=3` accounts for Render's current Cloudflare + Render proxy chain, so rate limits use the client IP. If Render changes its edge and limits still group users, inspect `X-Forwarded-For` and adjust the value.
+- Uploaded files are streamed to Supabase Storage; no persistent Render disk is required.
+- The Docker container sets `UPLOAD_TEMP_DIR=/tmp/eduvia-uploads`.
+- Render’s filesystem is ephemeral, so temporary processing files disappear on restart.
 
-Get the API URL:
+## 4. Verify the backend
 
-```bash
-export API_URL="$(gcloud run services describe eduvia-api \
-  --region "$REGION" \
-  --format='value(status.url)')"
+Render shows the public service URL after the first successful deploy, for example:
 
-echo "$API_URL"
+```text
+https://eduvia-api.onrender.com
 ```
 
-Verify the service is up:
+Check that the API is reachable:
 
 ```bash
-curl -i "$API_URL/api/users/me"
+curl -i https://eduvia-api.onrender.com/api/users/me
 ```
 
-An unauthenticated request should return `401 AUTH_REQUIRED`. A `500` or HTML page means the container did not start correctly; inspect Cloud Run logs.
+The response should be `401 AUTH_REQUIRED`. A persistent `502` or `503`, or repeated restarts, means the container is not starting; inspect Render logs.
 
-## 6. Deploy the frontend to Vercel
+Free instances sleep after inactivity. The first request after a sleep can take roughly a minute and may return a Render loading page or a transient error. Wait for the service to wake, then retry the request.
+
+## 5. Deploy the frontend to Vercel
 
 1. Import the repository into Vercel.
 2. Set **Root Directory** to `frontend`.
@@ -180,7 +136,7 @@ An unauthenticated request should return `401 AUTH_REQUIRED`. A `500` or HTML pa
    ```text
    VITE_SUPABASE_URL=https://your-project-ref.supabase.co
    VITE_SUPABASE_ANON_KEY=your-publishable-or-anon-key
-   VITE_API_URL=https://your-cloud-run-url
+   VITE_API_URL=https://eduvia-api.onrender.com
    ```
 
    `VITE_API_URL` must not end with a slash.
@@ -189,68 +145,72 @@ An unauthenticated request should return `401 AUTH_REQUIRED`. A `500` or HTML pa
 
 Get the production domain, for example `https://eduvia.vercel.app`.
 
-## 7. Connect the frontend and backend
+## 6. Connect the frontend and backend
 
-Update Cloud Run CORS to the exact Vercel origin:
+Update Render’s CORS setting to the exact Vercel origin:
 
-```bash
-gcloud run services update eduvia-api \
-  --region "$REGION" \
-  --update-env-vars "CORS_ALLOWED_ORIGINS=https://eduvia.vercel.app"
+```text
+CORS_ALLOWED_ORIGINS=https://eduvia.vercel.app
 ```
 
 Use the actual Vercel production URL. Origins are exact: include `https://`, do not add a trailing slash, and never use `*`. For Vercel preview deployments, add each preview origin explicitly or use production deployments only.
+
+Saving environment variables with **Save and deploy** triggers a new Render deploy. Wait for it to finish before testing.
 
 In Supabase **Authentication → URL Configuration**:
 
 - Set **Site URL** to the Vercel production URL.
 - No email confirmation or password-reset flow is used by the current app, but this keeps auth configuration aligned.
 
-## 8. Verify the deployment
+## 7. Verify the deployment
 
 - Open the Vercel URL.
 - Register a student with a `TUPT-XX-XXXX` username.
 - Sign out and back in.
 - Register a teacher using the teacher access code.
 - Create a subject and check its invite link and class code.
-- Join with the class code from a student account.
-- Upload a PDF or PPTX presentation; confirm previews generate.
+- Join with the class code from a student account, then approve the request if the subject uses approval.
+- Upload a PDF presentation and confirm its previews generate.
+- On the paid 2 GB plan, upload a PPTX and confirm conversion completes. On Render Free, test only a small deck.
 - Open a quiz result summary and test CSV and Print/PDF.
-- Check Cloud Run logs for errors:
+- Check Render logs for startup, memory, and conversion errors.
 
-  ```bash
-  gcloud run services logs read eduvia-api --region "$REGION" --limit 100
-  ```
+## Render plan guidance
 
-## Free-tier notes
+| Render plan | Memory / CPU | Expected behavior |
+| --- | --- | --- |
+| Free | 512 MB / 0.1 CPU | Core app works; LibreOffice conversion may be killed for memory or take a long time |
+| Paid `0.5c-512mb` | 512 MB / 0.5 CPU | Same memory risk, but faster |
+| Paid `1c-2g` | 2 GB / 1 CPU | Recommended for presentation previews |
 
-Cloud Run's monthly free allowance includes roughly 2 million requests, 180,000 vCPU-seconds, and 360,000 GiB-seconds. At 2 GiB memory and 1 vCPU, expect roughly 50 hours of active instance time per month, shared across requests. The service cold-starts after idle periods.
+Render Free is intended for demos and personal projects, not production classes. If previews are not essential, it is enough for the rest of the application. PDF presentations skip LibreOffice and are much lighter than PPTX, though very large decks can still be slow. If PPTX previews are required, use the `1c-2g` plan (about $25/month at the time of writing) or convert presentations to PDF before uploading.
 
-If presentation conversion is heavy:
+Supabase Free also has storage and bandwidth limits; monitor them if students upload many files. Free projects pause after a period of inactivity, so restore the project from the Supabase dashboard before class if it has been idle.
 
-- Keep `--memory 2Gi` and `--concurrency 1`.
-- Watch Cloud Run memory and timeout logs.
-- Increase the instance size or allow a paid tier for regular PPTX uploads.
+### Render free-tier limits
 
-Supabase Free has storage and bandwidth limits; monitor them if students upload many files.
+- 750 free instance hours per workspace per month. A service kept awake around the clock consumes about 720.
+- Free web services spin down after 15 minutes without traffic and take about a minute to wake.
+- 500 build pipeline minutes per month. Docker builds that install LibreOffice consume more than a native Node build.
+- 5 GB outbound bandwidth per month, shared by the workspace. Backend uploads to Supabase Storage count toward this.
+- A free instance can be restarted by Render at any time; the filesystem is ephemeral.
+- Free services cannot attach a persistent disk or scale beyond one instance.
 
-The Cloud Run container image includes LibreOffice, so Artifact Registry storage can exceed its small free allowance and incur a minor monthly charge. Cloud Build also has a free build-minutes allowance; the first image build is the largest.
+Vercel Hobby is free for non-commercial personal projects and includes 100 GB of fast data transfer per month. Review Vercel's fair-use terms before using it for an institutional deployment.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Frontend cannot reach API | `VITE_API_URL`, then redeploy Vercel because Vite env values are baked at build time. |
-| Browser CORS error | Exact `CORS_ALLOWED_ORIGINS` value; update Cloud Run and confirm the new revision is serving. |
-| `500` on upload | Cloud Run memory/time limits, LibreOffice/Poppler in the image, and Cloud Run logs. |
-| `soffice` or `pdftoppm` not found | The Cloud Run image must be built from `backend/Dockerfile`, not a plain Node image. |
-| Cloud Build cannot push the image | Grant the Cloud Build service account `roles/artifactregistry.writer` on the Artifact Registry repository. |
-| `413 Payload Too Large` | Cloud Run limits HTTP request bodies to about 32 MB. Current upload limits are below that; video uploads would need a different path. |
-| Backend starts but database checks fail | Supabase migrations and `SUPABASE_URL` / service-role secret. |
-| Teacher registration disabled | `TEACHER_REGISTRATION_CODE` secret is missing or shorter than 16 characters. |
-| `INVALID_TOKEN` | Legacy JWT secret configuration; newer JWT signing-key projects should leave `SUPABASE_JWT_SECRET` unset. |
-| Cold start delays | Expected with `--min-instances 0`; set a minimum instance or accept the wake-up delay. |
+| Render deploy fails during install | `backend/Dockerfile`, Render logs, and `backend/package-lock.json` |
+| Service restarts with memory errors or exit code 137 | Upgrade the Render instance; LibreOffice is exceeding the 512 MB free limit |
+| PPTX upload fails or the service restarts | LibreOffice ran out of memory; use the 2 GB instance, a smaller deck, or PDF-only uploads |
+| Browser CORS error | Set the exact Vercel origin in Render and confirm the new deploy finished |
+| Many users get `429` at once | `TRUST_PROXY_HOPS` is missing or does not match Render's current proxy chain (3 at the time of writing) |
+| Frontend cannot reach API | `VITE_API_URL`, then redeploy Vercel because Vite env values are baked at build time |
+| Backend starts but database checks fail | Re-run Supabase migrations and verify `SUPABASE_URL` / service-role secret |
+| Teacher registration disabled | `TEACHER_REGISTRATION_CODE` is missing or shorter than 16 characters |
+| `INVALID_TOKEN` | Legacy JWT secret configuration; newer JWT signing-key projects should leave `SUPABASE_JWT_SECRET` unset |
+| First request is very slow | Render Free cold start; use a paid always-on instance if this is a problem |
 
-## Render note
-
-The same Docker image can run on Render, but Render Free is 512 MB RAM / 0.1 CPU. Core features may work, while PPTX preview generation may fail or time out. For reliable previews on Render, use a paid instance with at least 1 CPU and 2 GB RAM.
+The same Docker image also runs on Google Cloud Run if you later want to try its monthly free allowance.

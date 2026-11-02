@@ -48,6 +48,7 @@ const optionalTeacherRegistrationCode = z.preprocess(
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   CORS_ALLOWED_ORIGINS: corsOriginsSchema,
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])

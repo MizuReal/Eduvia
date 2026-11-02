@@ -13,6 +13,10 @@ import { apiRouter } from './routes/index.js'
 export function createApp() {
   const app = express()
 
+  if (env.TRUST_PROXY_HOPS > 0) {
+    app.set('trust proxy', env.TRUST_PROXY_HOPS)
+  }
+
   app.disable('x-powered-by')
   app.use(helmet())
   app.use(cors({ origin: env.CORS_ALLOWED_ORIGINS }))

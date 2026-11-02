@@ -99,7 +99,7 @@ TEACHER_REGISTRATION_CODE=use-at-least-16-characters
 # SUPABASE_JWT_SECRET=your-legacy-jwt-secret
 ```
 
-Other optional upload and storage settings are documented in `backend/.env.example`.
+Other optional settings are documented in `backend/.env.example`.
 
 ## 4. Configure the frontend
 
