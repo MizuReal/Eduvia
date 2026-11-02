@@ -34,7 +34,7 @@ There is no CI pipeline yet. These three gates are the gate.
 ```
 schemas/                 Ordered SQL migrations (001_profiles.sql, 002_courses.sql, ...)
 DESIGN.md                Design system — single source of truth for all UI
-docs/SPEC.md             Product contract — API, files/uploads, quizzes, database + RLS
+docs/SPEC.md             Product contract — API, files/uploads, quizzes, enrollment, database + RLS
 frontend/src/services/   API + Supabase auth wrappers (only place Supabase is called)
 frontend/src/context/    AuthContext provider
 frontend/src/components/content/  Tiptap editor, slide rail, asset node views
@@ -123,8 +123,13 @@ These are stated once, here. Every other section assumes them.
   Images and embedded files are custom nodes that store only file ids; resolve them through
   signed URLs. Uploads use the shared progress, cancel, retry, processing, ready, and failed
   states.
-- Quiz runner: autosave answers, support resume, show time remaining, confirm before submitting,
-  never reveal answers before submission.
+- Quiz authoring: the **Quiz** tab offers native A–D question editing or a PDF/DOCX paper with an
+  A–D answer key. Preview grading calls the server; never compute a score in the browser.
+- Enrollment: teachers share an invite link, choose approval or auto-accept, and manage a
+  roster. Students see only active subjects and a read-only topic/lesson table of contents.
+  Never expose lesson content or quizzes to students in this pass.
+- Quiz runner (deferred): autosave answers, support resume, show time remaining, confirm before
+  submitting, never reveal answers before submission.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
 - Styling: Tailwind utilities composed from `DESIGN.md` tokens. No CSS modules, no CSS-in-JS.
@@ -169,8 +174,15 @@ These are stated once, here. Every other section assumes them.
   re-encode with `sharp`, SHA-256 checksum, per-user quota, and short-lived signed URLs.
 - Topic content: validate Tiptap JSON against the server allowlist before persistence, and
   validate every embedded file reference against its owning content item.
+- Quizzes: validate mode, question counts, unique options, and answer keys with Zod; enforce
+  ownership in the service. Grading is server-side only and preview attempts are never stored.
+  DOCX quiz papers are converted with `mammoth` plus `sanitize-html` before storage.
+- Enrollment: every teacher action verifies course ownership; every student action derives the
+  student id from the authenticated token. Enrollment mutations are idempotent and never trust a
+  client-supplied status or student id.
 - All third-party calls originate here. No server-side fetching of user-supplied URLs (no SSRF).
-- Write admin actions, role changes, publishes, unpublishes, and content removals to `audit_logs`.
+- Write admin actions, role changes, course and quiz publishing, unpublishes, quiz paper
+  replacement/removal, quiz deletion, and content removals to `audit_logs`.
 
 ## Data & Supabase
 
@@ -188,12 +200,15 @@ These are stated once, here. Every other section assumes them.
 - Never overwrite a file in place: a replacement is a new record, and the old one is soft-deleted
   once the new file is ready.
 - No orphaned records or storage objects. Cleanup jobs are idempotent and auditable.
-- Table list, buckets, and the per-role RLS matrix: **`docs/SPEC.md` §4**.
+- Table list, buckets, and the per-role RLS matrix: **`docs/SPEC.md` §5**.
 
 ## Domain invariants
 
 - Courses are `draft`, `published`, or `archived`. Only the owner or an admin may edit.
   Publishing requires at least one lesson with at least one block, and is transactional.
+- Course lifecycle status remains target behavior. Current enrollment availability is controlled
+  separately by `courses.enrollment_open`, so a subject can be open for joining without a full
+  publish workflow.
 - Course codes are generated from the course name when omitted, with a numeric suffix for
   collisions in the same instructor/trimester/year-level scope. Custom codes remain supported and
   must satisfy the same uniqueness rule.
@@ -205,20 +220,38 @@ These are stated once, here. Every other section assumes them.
   batch; individually deleted lessons remain in the trash. Restored topics and lessons append.
 - Lesson blocks have explicit types: `text`, `image`, `file`, `video`, `quiz`.
 - Topic content is a singleton workspace per topic: one Tiptap slides document, one Tiptap
-  document, and one uploaded presentation. The editor opens directly on the PPTX tab; Docs and
-  Upload are the other two tabs.
+  document, one uploaded presentation, and one quiz. The editor opens directly on the PPTX tab;
+  Docs, Upload, and Quiz are the other three tabs.
 - The slides editor stores a versioned list of slides, each a Tiptap document. Docs and slides
   store embedded image/file references as file ids, never signed URLs or base64 data.
 - Uploaded presentations keep the original file and a required summary. Replacing an upload
   creates a new file record and soft-deletes the previous file once the new file is ready.
+- A quiz is either `native` (10–20 A–D multiple-choice questions authored in Eduvia) or
+  `document` (a PDF/DOCX paper plus a numbered A–D answer key). Mode is fixed once created.
+- Native questions have one correct A–D option and duplicate options are rejected. Document
+  papers are replaced as new file records; the previous paper is soft-deleted once the new file is
+  ready.
+- Publishing requires 10–20 complete answers and, for document quizzes, a `ready` paper.
+  Publishing increments `version`; drafts stay on version 1.
+- Teacher preview grading is server-side and never persisted. Student attempts, timers,
+  autosave, enrollment checks, manual grading, and the student runner are deferred.
+- A subject has one enrollment setting: open or closed, with `approval` or `auto` mode. New
+  subjects start closed and require approval.
+- One enrollment row exists per `(course_id, student_id)` with status `pending`, `active`,
+  `rejected`, or `removed`. Rejected and removed students may request again.
+- Removing a student revokes subject access immediately. Approval, rejection, and removal are
+  restricted to the course owner.
+- Students see subject metadata and the ordered topics/lessons only. Lesson content, files, and
+  quizzes remain out of scope until the student runner lands.
 - Course text is stored as Tiptap JSON and rendered through the shared renderer or converted to
   sanitized HTML server-side. Raw client HTML is never rendered.
-- Students self-enroll only in published courses; enrollment is idempotent. Instructors and
-  admins manage enrollment for courses they manage.
+- Students self-enroll through the subject invite link; enrollment is idempotent. Instructors
+  manage the roster for courses they own.
 - Lesson completion is idempotent and recalculates enrollment progress from completed lessons.
 - An upload is invisible to students until it reaches `ready`. Validate by magic bytes with
   `file-type`; never trust the extension or the client `Content-Type`.
-- Details: **`docs/SPEC.md` §2** for files and uploads, **§3** for quizzes and grading.
+- Details: **`docs/SPEC.md` §2** for files and uploads, **§3** for quizzes, **§4** for
+  enrollment.
 
 ## API
 
@@ -239,12 +272,14 @@ These are stated once, here. Every other section assumes them.
 
 - Frontend: Vitest + React Testing Library in jsdom. Suites live in `frontend/src/__tests__/`;
   setup and shared doubles in `frontend/src/test/`. Cover role-aware routing, form validation,
-  upload states, slides editing, embedded image/file rendering, quiz runner timer and resume
-  behavior, and accessibility-critical interactions.
+  upload states, slides editing, embedded image/file rendering, quiz authoring and preview
+  states, enrollment dashboard and invite flows, teacher roster actions, quiz runner timer and
+  resume behavior, and accessibility-critical interactions.
 - Backend: Vitest + Supertest. Suites live in `backend/tests/*.test.ts`; env setup and fixtures in
   `backend/src/test/`. Cover auth middleware, role authorization, Zod validation, Tiptap content
   validation, embedded-file ownership, image/document validation, signed URL issuance, quiz
-  grading, attempt snapshots, and soft-delete behavior.
+  authoring and preview grading, enrollment approval/auto/removal, attempt snapshots, and
+  soft-delete behavior.
 - Tests never touch a real Supabase project, storage, or the network. Mock
   `services/supabaseClient.ts`, `db/supabaseAdmin.ts`, storage calls, and `fetch`. Values come
   from committed `frontend/.env.test` and `backend/.env.test`; tests pass with no `.env` present.

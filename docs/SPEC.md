@@ -5,11 +5,14 @@ file holds the shapes, limits, state machines, and policies. Where the two overl
 wins on process and this file wins on detail.
 
 Scope note: the implemented surface today is auth, profiles, courses, course-outline
-management (`course_topics`, lesson entries, reordering, moving, and restore), and topic
-content (a Tiptap slides editor, a Tiptap docs editor, an uploaded presentation, and embedded
-image/file assets), across migrations `001_profiles.sql` through
-`008_singleton_topic_content.sql`. Lesson content blocks, enrollment, and quizzes below are the
-target contract — build them to this spec, not to an approximation of it.
+management (`course_topics`, lesson entries, reordering, moving, and restore), topic content
+(a Tiptap slides editor, a Tiptap docs editor, an uploaded presentation, and embedded
+image/file assets), instructor quiz authoring (native A–D questions, an uploaded quiz paper
+with an A–D answer key, publish validation, and teacher-preview grading), and enrollment
+(invite links, approval or auto-accept, rosters, and read-only student subject pages), across
+migrations `001_profiles.sql` through `010_enrollment.sql`. Lesson content blocks, enrollment
+progress, and the student quiz runner below are the target contract — build them to this spec,
+not to an approximation of it.
 
 ---
 
@@ -56,18 +59,27 @@ POST   /api/files
 GET    /api/files/:fileId/url                                 ✓
 DELETE /api/files/:fileId
 
-POST   /api/enrollments
-DELETE /api/enrollments/:enrollmentId
-GET    /api/enrollments/me
+GET    /api/enrollments/me                                   ✓ student-only
+GET    /api/enrollments/join/:courseId                        ✓ student-only
+POST   /api/enrollments                                       ✓ student-only
+GET    /api/student/subjects/:courseId                        ✓ student-only
+GET    /api/courses/:courseId/enrollments                     ✓ instructor-only
+PATCH  /api/courses/:courseId/enrollment-settings             ✓ instructor-only
+POST   /api/enrollments/:enrollmentId/approve                 ✓ instructor-only
+POST   /api/enrollments/:enrollmentId/reject                  ✓ instructor-only
+DELETE /api/enrollments/:enrollmentId                         ✓ instructor-only
 POST   /api/lessons/:lessonId/complete
 
-POST   /api/quizzes
-GET    /api/quizzes/:quizId
-PATCH  /api/quizzes/:quizId
-POST   /api/quizzes/:quizId/publish
-POST   /api/quizzes/:quizId/questions
-PATCH  /api/questions/:questionId
-DELETE /api/questions/:questionId
+GET    /api/topics/:topicId/quiz                              ✓ instructor-only
+PUT    /api/topics/:topicId/quiz                              ✓ instructor-only
+GET    /api/quizzes/:quizId                                   ✓ instructor-only
+PUT    /api/quizzes/:quizId                                   ✓ instructor-only
+DELETE /api/quizzes/:quizId                                   ✓ instructor-only
+POST   /api/quizzes/:quizId/publish                           ✓ instructor-only
+POST   /api/quizzes/:quizId/preview-grade                     ✓ instructor-only
+POST   /api/quizzes/:quizId/paper                             ✓ instructor-only
+DELETE /api/quizzes/:quizId/paper                             ✓ instructor-only
+
 POST   /api/quizzes/:quizId/attempts
 GET    /api/attempts/:attemptId
 PATCH  /api/attempts/:attemptId/answers
@@ -124,6 +136,39 @@ PATCH  /api/admin/users/:userId/role
   "mimeType": "...", "sizeBytes": 123, "fileClass": "image" | "document", "width": number | null,
   "height": number | null }`. The URL is short-lived and never logged, cached, or sent to
   analytics. Storage paths are never returned.
+- `GET /api/topics/:topicId/quiz` returns the topic plus its singleton `quiz` or `null`. The
+  quiz includes its ordered questions, status, version, and paper metadata but never a storage
+  path.
+- `PUT /api/topics/:topicId/quiz` is idempotent and accepts `{ "mode": "native" | "document" }`.
+  It creates a draft `Untitled quiz` when none exists. An existing quiz keeps its mode; a
+  different mode returns `409 QUIZ_MODE_LOCKED`.
+- `PUT /api/quizzes/:quizId` saves quiz settings and content in one transaction. Native quizzes
+  accept `questions[]` with `prompt`, `optionA`–`optionD`, `correctOption` (`A`–`D`), and an
+  optional `explanation`. Document quizzes accept `answers[]` of `A`–`D` for 10–20 numbered
+  questions. Sending the wrong shape for the mode returns `400 QUIZ_MODE_MISMATCH`.
+- `POST /api/quizzes/:quizId/publish` requires 10–20 questions with complete answers; a
+  document quiz also requires its paper. It returns `400 QUIZ_NOT_READY` otherwise and
+  increments `version` when republishing.
+- `POST /api/quizzes/:quizId/preview-grade` grades a teacher preview attempt server-side and
+  returns the score, percentage, pass/fail, and per-question results. It never stores an attempt.
+- `POST /api/quizzes/:quizId/paper` is multipart with `file` and accepts PDF or DOCX up to
+  25 MB. It replaces the paper transactionally; the previous file is soft-deleted once the new
+  file is ready. DOCX uploads store a sanitized preview.
+- `DELETE /api/quizzes/:quizId` soft-deletes the quiz, its questions, and its paper. Deleting a
+  paper with `DELETE /api/quizzes/:quizId/paper` returns the quiz to draft.
+- `GET /api/enrollments/me` returns the student's `active` subjects and `pending` requests.
+- `GET /api/enrollments/join/:courseId` returns the subject preview, enrollment state, and
+  whether enrollment is open. `POST /api/enrollments` accepts `{ "courseId": uuid }` and is
+  idempotent. It creates an `active` enrollment in `auto` mode and a `pending` request in
+  `approval` mode. A closed subject returns `409 ENROLLMENT_CLOSED`.
+- `GET /api/student/subjects/:courseId` returns subject metadata plus the ordered topics and
+  lesson titles. It returns 404 unless the student has an active enrollment.
+- `GET /api/courses/:courseId/enrollments` returns enrollment settings, pending requests, and
+  the active roster. `PATCH /api/courses/:courseId/enrollment-settings` accepts
+  `{ "open": boolean, "mode": "approval" | "auto" }`.
+- `POST /api/enrollments/:enrollmentId/approve` and `/reject` act on pending requests.
+  `DELETE /api/enrollments/:enrollmentId` removes an active or pending student. A removed
+  student may request again through the invite link.
 - In-progress attempt payloads omit correct answers, correct option ids, accepted answers,
   explanations, and scoring keys.
 
@@ -133,8 +178,8 @@ PATCH  /api/admin/users/:userId/role
 
 ### Topic content
 
-Each topic has a singleton content workspace with three tabs: **PPTX**, **Docs**, and
-**Upload**. Clicking **Manage content** opens the workspace directly on the PPTX tab. There is
+Each topic has a singleton content workspace with four tabs: **PPTX**, **Docs**, **Upload**,
+and **Quiz**. Clicking **Manage content** opens the workspace directly on the PPTX tab. There is
 no separate content list and no separate slides entity.
 
 - **PPTX** stores one versioned Tiptap slides document:
@@ -142,6 +187,8 @@ no separate content list and no separate slides entity.
 - **Docs** stores one Tiptap JSON document.
 - **Upload** stores the original PPTX/PDF plus a required plain-text summary. The original file
   is never edited or round-tripped.
+- **Quiz** stores one quiz per topic, either native questions or an uploaded quiz paper with an
+  A–D answer key (see §3).
 - The API creates a blank slides document or doc the first time its tab needs one. Each topic
   has at most one active `slides`, one active `doc`, and one active `presentation` row.
 - Images and embedded files use custom Tiptap nodes and store only a `fileId`:
@@ -171,7 +218,8 @@ no separate content list and no separate slides entity.
 
 Reject legacy `.doc`, macro-enabled `.docm`, executables, scripts, standalone archives (`.zip`,
 `.rar`, `.7z`), and SVG. Enforce a per-user storage quota in addition to per-file limits.
-Every limit is a configuration value, never a literal in a handler.
+Every limit is a configuration value, never a literal in a handler. Quiz papers accept only
+`.pdf` and `.docx` up to 25 MB.
 
 ### Validation order
 
@@ -249,67 +297,99 @@ not a duration limit.
 
 ## 3. Quizzes
 
-### Question types
+Every topic has at most one active quiz. A quiz is authored in one of two modes, and its mode is
+fixed once created:
 
-`single_choice`, `multiple_choice`, `true_false`, `short_answer`, `essay`.
+- **Native** — 10–20 multiple-choice questions stored in Eduvia. Each question has a prompt, four
+  options A–D, exactly one correct option, and an optional explanation. Questions can be added,
+  edited, duplicated, deleted, and reordered freely.
+- **Document** — the instructor uploads an existing PDF or DOCX quiz paper and enters an A–D
+  answer key for 10–20 numbered questions. The paper is the question surface; Eduvia stores no
+  parsed prompts. DOCX papers are converted to sanitized HTML for preview, and the original file
+  remains downloadable. Legacy `.doc` is rejected.
 
-- Objective types (`single_choice`, `multiple_choice`, `true_false`) auto-grade server-side.
-- `short_answer` either auto-grades by normalized exact match or is manually graded — the quiz
-  setting must be explicit, never inferred.
-- `essay` is always manually graded.
+Both modes require a title (2–160 characters), optional instructions (up to 5,000 characters),
+and a passing score percentage (0–100, default 75). Every question is worth 1 point in v1.
 
-Correct answers, accepted answers, and explanations live server-side and are never sent to a
-student before submission.
+### Publishing
 
-### Attempt snapshots
+- Drafts may be saved at any time, including incomplete ones.
+- Publishing requires 10–20 questions, a correct option for every question, and, in document
+  mode, a `ready` paper. Otherwise the API returns `400 QUIZ_NOT_READY`.
+- Publishing a quiz that is already published increments `version`. Editing a draft does not.
+- Only the course owner or an admin may author, publish, or delete a quiz.
 
-Starting an attempt snapshots the quiz: questions, options, points, correct answers,
-explanations, randomization seed, and question/option order. Later quiz edits cannot change an
-existing attempt.
+### Preview grading
 
-Editing a published quiz increments its `version`. New attempts use the new version; existing
-attempts keep their snapshot.
+`POST /api/quizzes/:quizId/preview-grade` grades a teacher preview attempt entirely server-side.
+The client sends only selected options; a client-supplied score, points value, or pass/fail is
+rejected. The response includes the score, maximum score, percentage, pass/fail against the
+quiz's passing score, and per-question correctness. Preview attempts are never persisted.
 
-### Attempt states
+Correct options and explanations are teacher-authoring data. They are never included in any
+student-facing response before submission; the student runner is deferred (see below).
 
-`in_progress`, `submitted`, `pending_review`, `graded`.
+### Paper previews
 
-### Timing
+| Type    | Treatment                                                        |
+| ------- | ---------------------------------------------------------------- |
+| `.pdf`  | Inline preview through a short-lived signed URL                  |
+| `.docx` | Converted to sanitized HTML with `mammoth`, shown in a sandboxed iframe |
 
-- `started_at` and `expires_at` are set on the server at attempt start.
-- A small, explicitly configured grace period absorbs network latency. Submissions after the
-  grace window are rejected.
-- Attempt limits count submitted and graded attempts, not abandoned in-progress ones.
+DOCX conversion enforces ZIP entry count, uncompressed size, and a conversion timeout before
+parsing. Stored preview HTML is capped at 2 MB. The original paper is always downloadable.
 
-### Saving answers
+### Deferred student flow
 
-Answers autosave per question. Saves are idempotent and can never create a duplicate answer for
-the same question.
+The student runner is not part of this pass. When it lands it must add:
 
-### Scoring
-
-- Grading is server-side only. A score, points value, or pass/fail supplied by the client is
-  rejected.
-- Each quiz stores an explicit passing score; pass/fail is computed during grading.
-- Multiple-choice scoring is all-or-nothing unless partial credit is explicitly configured on
-  that question.
-- Manual grading records `points_awarded`, `feedback`, `graded_by`, and `graded_at`. Points
-  cannot be negative or exceed the question maximum.
-- An attempt becomes `graded` only when every manual question has been graded.
-
-### Visibility
-
-Quiz settings decide whether correct answers and explanations are visible after submission.
-Results show per-question feedback with an icon **and** text — never color alone.
+- Attempt snapshots: starting an attempt snapshots questions, options, points, correct answers,
+  explanations, randomization seed, and question/option order. Later quiz edits cannot change an
+  existing attempt. New attempts use the new version; existing attempts keep their snapshot.
+- Attempt states: `in_progress`, `submitted`, `pending_review`, `graded`.
+- Server-set `started_at` and `expires_at`, a small explicit grace period, and attempt limits
+  that count submitted and graded attempts.
+- Per-question autosave that is idempotent and can never create a duplicate answer.
+- Server-side grading only; partial credit only when explicitly configured; manual grading
+  records `points_awarded`, `feedback`, `graded_by`, and `graded_at`, and an attempt becomes
+  `graded` only when every manual question is graded.
+- Quiz settings that decide whether correct answers and explanations are visible after
+  submission, with per-question feedback shown by icon **and** text — never color alone.
 
 ---
 
-## 4. Database, storage, and RLS
+## 4. Enrollment
+
+Every subject has one enrollment setting and at most one enrollment row per student.
+
+- **Invite link** — teachers share `/student/enroll/{courseId}`. Students open the link, see
+  the subject preview, and request or join. Course codes are not used for discovery because
+  they are unique only within an instructor/trimester/year-level scope.
+- **Open enrollment** — `courses.enrollment_open` defaults to `false`. Closing a subject blocks
+  new requests but keeps active students enrolled.
+- **Mode** — `courses.enrollment_mode` is `approval` (default) or `auto`. Approval creates a
+  `pending` row; auto creates an `active` row immediately.
+- **Statuses** — `pending`, `active`, `rejected`, `removed`. There is one row per
+  `(course_id, student_id)`.
+- **Re-requesting** — a `rejected` or `removed` student may request again. The existing row is
+  reset according to the subject's current mode and decision timestamps are cleared.
+- **Removal** — a teacher removes a student by setting the row to `removed`. Access to the
+  subject and its table of contents ends immediately.
+- **Student dashboard** — `/student` lists active subjects and pending requests.
+  `/student/subjects/{courseId}` shows subject metadata, ordered topics, and lesson titles only;
+  it does not expose lesson content, files, or quizzes.
+- **Teacher roster** — `/teacher/subjects/{courseId}/students` shows the invite link, enrollment
+  switch, mode, pending requests, and enrolled students. Approve, reject, and remove actions
+  verify course ownership.
+
+---
+
+## 5. Database, storage, and RLS
 
 ### Core tables
 
 `profiles`, `courses`, `course_topics`, `lessons`, `topic_content_items`, `files`,
-`audit_logs`, `lesson_blocks`, `quizzes`, `quiz_questions`, `quiz_options`, `quiz_attempts`,
+`audit_logs`, `lesson_blocks`, `quizzes`, `quiz_questions`, `quiz_attempts`,
 `attempt_answers`, `enrollments`, `lesson_progress`.
 
 ### Constraints
@@ -318,7 +398,10 @@ Results show per-question feedback with an icon **and** text — never color alo
   `instructor`, or `admin`. Only an admin may change a role.
 - `courses` is unique on `(instructor_id, code, term, year_level)` where the course is not
   soft-deleted. Generated codes use this same scope; custom codes must satisfy it too.
-- `enrollments` is unique on `(course_id, student_id)`.
+- `courses.enrollment_open` defaults to `false`; `courses.enrollment_mode` is `approval` or
+  `auto`.
+- `enrollments` is unique on `(course_id, student_id)` and constrains `status` to `pending`,
+  `active`, `rejected`, or `removed`.
 - `course_topics` is unique on `(id, course_id)`; `lessons` references that pair with a composite
   `(topic_id, course_id)` foreign key.
 - Topics and lessons use an `order_index`; the table of contents is their ordered projection.
@@ -337,35 +420,42 @@ Results show per-question feedback with an icon **and** text — never color alo
 - `topic_content_items.slide_count` is generated from `content->'slides'`.
 - `files.content_id` links embedded assets to their owning content item; files are soft-deleted,
   never hard-deleted by application code.
+- `quizzes` is unique on `topic_id` where `deleted_at is null`; it references
+  `(topic_id, course_id)` with a composite foreign key. `mode` is `native` or `document`,
+  `status` is `draft` or `published`, and `file_id` is unique and required only for document
+  quizzes.
+- `quiz_questions` belongs to a quiz, orders with a contiguous `order_index`, and constrains
+  `correct_option` to `A`, `B`, `C`, or `D`. Native questions carry prompt, four options, and an
+  optional explanation; document questions carry only the answer key.
 - `quizzes.version` increases monotonically; editing a published quiz increments it.
 - `quiz_attempts` references the quiz version and stores the immutable snapshot.
-- `audit_logs` is append-only and records admin actions, role changes, course publishing, and
-  content removal.
+- `audit_logs` is append-only and records admin actions, role changes, course publishing,
+  quiz publishing, quiz paper replacement/removal, quiz deletion, and content removal.
 
 ### Buckets
 
 `course-files`, `course-thumbnails`, `avatars`. All private, all RLS-enabled, all served only
-through short-lived signed URLs. `course-files` holds uploaded presentations and embedded
-assets under `courses/{course_id}/{file_id}/{name}`. The backend writes course-scoped paths and
-records ownership in `files`, and reads through the service role only within the owning
-course's scope.
+through short-lived signed URLs. `course-files` holds uploaded presentations, quiz papers, and
+embedded assets under `courses/{course_id}/{file_id}/{name}`. The backend writes course-scoped
+paths and records ownership in `files`, and reads through the service role only within the
+owning course's scope.
 
 ### RLS matrix
 
 - **Anonymous** — reads published course metadata (catalog); writes nothing.
-- **Student** — reads own profile, content and quizzes of published courses they are enrolled in,
-  own enrollments, own attempts and lesson progress; writes own profile, own in-progress answers,
-  own enrollments and lesson progress.
+- **Student** — reads own profile, subjects they are actively enrolled in, their topics and
+  lessons, own enrollments, own attempts and lesson progress; writes own profile, own
+  in-progress answers and lesson progress. Enrollment requests are made through the API.
 - **Instructor** — reads and writes own courses, course topics, lessons, topic content, files,
-  blocks, quizzes; reads the enrollments and attempts for their courses; writes enrollment for
-  courses they manage.
+  blocks, quizzes; reads the enrollments for their courses; writes enrollment settings and
+  approve/reject/remove decisions for courses they manage.
 - **Admin** — reads and writes all rows and all storage objects.
 
 Draft and archived courses are visible only to their owner and admins. Policies use `auth.uid()`
 and a trusted role helper — never a role claim supplied or editable by the client. Storage
 policies mirror table policies: owners, enrolled students, and admins only.
 
-Shipped behavior is currently narrower than this matrix: the entire `/api/courses` surface,
-the outline routes, and the topic-content/file routes sit behind `requireAuth` +
-`requireRole('instructor')`. The student and anonymous catalog rows above are target behavior,
-not current behavior.
+Shipped behavior is currently narrower than this matrix: the `/api/courses` surface, the outline
+routes, and the topic-content/file routes sit behind `requireAuth` + `requireRole('instructor')`.
+Enrollment routes use explicit `student` or `instructor` gates. The anonymous catalog rows above
+remain target behavior, not current behavior.

@@ -88,6 +88,9 @@
   --spacing-section-lg: 96px;
 
   --container-modal: 28rem;
+  /* Named card width: max-w-* t-shirt sizes resolve from --spacing-*, so the
+     narrow gate and error cards need a non-colliding token. */
+  --container-card: 36rem;
 
   --shadow-soft:
     rgba(0, 0, 0, 0.01) 0 0.175px 1.041px,

@@ -5,7 +5,7 @@ import { findCourseForInstructor } from './courses.js'
 import { supabaseAdmin } from './supabaseAdmin.js'
 
 const FILE_COLUMNS =
-  'id, course_id, topic_id, uploaded_by, bucket, storage_path, original_name, mime_type, size_bytes, checksum_sha256, file_class, width, height, status, content_id, deleted_at, created_at, updated_at'
+  'id, course_id, topic_id, uploaded_by, bucket, storage_path, original_name, mime_type, size_bytes, checksum_sha256, file_class, width, height, status, content_id, preview_html, deleted_at, created_at, updated_at'
 
 export type FileSelectRow = Pick<
   FileRow,
@@ -24,6 +24,7 @@ export type FileSelectRow = Pick<
   | 'height'
   | 'status'
   | 'content_id'
+  | 'preview_html'
   | 'deleted_at'
   | 'created_at'
   | 'updated_at'

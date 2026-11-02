@@ -23,6 +23,7 @@ import {
   ChevronUp,
   FileText,
   GripVertical,
+  ListChecks,
   Pencil,
   Trash2,
 } from 'lucide-react'
@@ -82,6 +83,7 @@ type TopicCardProps = {
   onEditTopic: (topic: CourseTopic) => void
   onDeleteTopic: (topic: CourseTopic) => void
   onManageContent: (topic: CourseTopic) => void
+  onMakeQuiz: (topic: CourseTopic) => void
   onMoveLesson: (topicId: string, lesson: Lesson, offset: number) => void
   onEditLesson: (topicId: string, lesson: Lesson) => void
   onDeleteLesson: (topicId: string, lesson: Lesson) => void
@@ -95,6 +97,7 @@ function TopicCard({
   onEditTopic,
   onDeleteTopic,
   onManageContent,
+  onMakeQuiz,
   onMoveLesson,
   onEditLesson,
   onDeleteLesson,
@@ -145,7 +148,7 @@ function TopicCard({
                 {topic.lessons.length === 1 ? 'lesson' : 'lessons'}
               </span>
               <p className="mt-xxs text-caption text-ink-muted">
-                Slides, docs, and uploaded presentations
+                Slides, docs, presentations, and quizzes
               </p>
             </div>
 
@@ -157,6 +160,14 @@ function TopicCard({
               >
                 <FileText className="size-4" aria-hidden="true" />
                 Manage content
+              </button>
+              <button
+                type="button"
+                onClick={() => onMakeQuiz(topic)}
+                className="inline-flex min-h-11 items-center gap-xxs rounded-full border border-hairline bg-surface px-md text-body-sm font-medium text-ink transition-colors hover:bg-canvas-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <ListChecks className="size-4" aria-hidden="true" />
+                Make a quiz
               </button>
               <IconActionButton
                 label={`Move topic ${topic.title} up`}
@@ -312,6 +323,7 @@ type TableOfContentsProps = {
   onEditTopic: (topic: CourseTopic) => void
   onDeleteTopic: (topic: CourseTopic) => void
   onManageContent: (topic: CourseTopic) => void
+  onMakeQuiz: (topic: CourseTopic) => void
   onMoveLesson: (topicId: string, lesson: Lesson, offset: number) => void
   onEditLesson: (topicId: string, lesson: Lesson) => void
   onDeleteLesson: (topicId: string, lesson: Lesson) => void
@@ -325,6 +337,7 @@ export function TableOfContents({
   onEditTopic,
   onDeleteTopic,
   onManageContent,
+  onMakeQuiz,
   onMoveLesson,
   onEditLesson,
   onDeleteLesson,
@@ -450,6 +463,7 @@ export function TableOfContents({
                   onEditTopic={onEditTopic}
                   onDeleteTopic={onDeleteTopic}
                   onManageContent={onManageContent}
+                  onMakeQuiz={onMakeQuiz}
                   onMoveLesson={onMoveLesson}
                   onEditLesson={onEditLesson}
                   onDeleteLesson={onDeleteLesson}

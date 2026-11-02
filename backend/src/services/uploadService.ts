@@ -6,12 +6,13 @@ import {
   IMAGE_EXTENSIONS,
   IMAGE_MAX_DIMENSION,
   PRESENTATION_EXTENSIONS,
+  QUIZ_PAPER_EXTENSIONS,
 } from '../config/constants.js'
 import { env } from '../config/env.js'
 import { AppError } from '../errors/AppError.js'
 import { calculateChecksum, getFileExtension } from '../utils/files.js'
 
-export type UploadPolicy = 'presentation' | 'image' | 'document'
+export type UploadPolicy = 'presentation' | 'image' | 'document' | 'quiz-paper'
 
 export type ValidatedUpload = {
   buffer: Buffer
@@ -58,6 +59,10 @@ function isAllowedExtension(policy: UploadPolicy, extension: string): boolean {
 
   if (policy === 'image') {
     return (IMAGE_EXTENSIONS as readonly string[]).includes(extension)
+  }
+
+  if (policy === 'quiz-paper') {
+    return (QUIZ_PAPER_EXTENSIONS as readonly string[]).includes(extension)
   }
 
   return (DOCUMENT_EXTENSIONS as readonly string[]).includes(extension)

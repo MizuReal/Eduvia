@@ -7,6 +7,19 @@ export const COURSE_TERMS = [
 
 export type CourseTerm = (typeof COURSE_TERMS)[number]
 
+export const ENROLLMENT_MODES = ['approval', 'auto'] as const
+
+export type EnrollmentMode = (typeof ENROLLMENT_MODES)[number]
+
+export const ENROLLMENT_STATUSES = [
+  'pending',
+  'active',
+  'rejected',
+  'removed',
+] as const
+
+export type EnrollmentStatus = (typeof ENROLLMENT_STATUSES)[number]
+
 export const YEAR_LEVELS = [1, 2, 3, 4] as const
 
 export type YearLevel = (typeof YEAR_LEVELS)[number]
@@ -40,6 +53,28 @@ export const YEAR_LEVEL_OPTIONS: readonly {
   { value: 3, label: '3rd Year' },
   { value: 4, label: '4th Year' },
 ]
+
+export const ENROLLMENT_MODE_OPTIONS: readonly {
+  value: EnrollmentMode
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'approval',
+    label: 'Approve requests',
+    description: 'Students join after you approve their request.',
+  },
+  {
+    value: 'auto',
+    label: 'Auto-accept',
+    description: 'Students join immediately through the invite link.',
+  },
+]
+
+export const ENROLLMENT_MODE_LABELS: Record<EnrollmentMode, string> = {
+  approval: 'Approval required',
+  auto: 'Auto-accept',
+}
 
 const COURSE_TERM_LABELS: Record<CourseTerm, string> = {
   first_trimester: '1st Trimester',

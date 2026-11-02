@@ -77,6 +77,12 @@ vi.mock('../components/content/UploadPanel', () => ({
   UploadPanel: () => <p>Upload panel</p>,
 }))
 
+vi.mock('../components/quiz/QuizEditorPanel', () => ({
+  QuizEditorPanel: ({ isActive }: { isActive: boolean }) => (
+    <p>Quiz editor ({isActive ? 'active' : 'inactive'})</p>
+  ),
+}))
+
 const courseId = 'c7c39a20-96a2-4c7e-9d29-37b60a8d9ae8'
 const topicId = '11111111-1111-4111-8111-111111111111'
 const slidesId = '22222222-2222-4222-8222-222222222222'
@@ -195,6 +201,16 @@ describe('TopicEditorPage', () => {
       await screen.findByRole('tab', { name: /upload/i }),
     ).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Upload panel')).toBeInTheDocument()
+  })
+
+  it('opens the quiz tab from the URL', async () => {
+    renderPage(`/teacher/subjects/${courseId}/topics/${topicId}?tab=quiz`)
+
+    expect(await screen.findByRole('tab', { name: /quiz/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByText('Quiz editor (active)')).toBeInTheDocument()
   })
 
   it('creates missing slides and documents before opening the editors', async () => {

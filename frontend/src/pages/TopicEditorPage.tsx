@@ -15,6 +15,7 @@ import { SlidesEditorPanel } from '../components/content/SlidesEditorPanel'
 import { TopicTabs } from '../components/content/TopicTabs'
 import type { TopicTab } from '../components/content/TopicTabs'
 import { UploadPanel } from '../components/content/UploadPanel'
+import { QuizEditorPanel } from '../components/quiz/QuizEditorPanel'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
 import {
@@ -34,7 +35,7 @@ type TopicEditorPageProps = {
 }
 
 function parseTab(value: string | null): TopicTab {
-  if (value === 'docs' || value === 'upload') {
+  if (value === 'docs' || value === 'upload' || value === 'quiz') {
     return value
   }
 
@@ -53,7 +54,7 @@ function EditorSkeleton() {
 
 function NotFound() {
   return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
+    <div className="mt-xl max-w-card rounded-lg border border-hairline bg-surface p-lg shadow-soft">
       <CircleAlert
         className="size-5 text-accent-orange-deep"
         aria-hidden="true"
@@ -76,7 +77,7 @@ function LoadError({
   return (
     <div
       role="alert"
-      className="mt-xl max-w-xl rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
+      className="mt-xl max-w-card rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
     >
       <CircleAlert
         className="size-5 text-accent-orange-deep"
@@ -108,6 +109,7 @@ export function TopicEditorPage({ onOpenAuth }: TopicEditorPageProps) {
   const [reloadKey, setReloadKey] = useState(0)
   const [slidesDirty, setSlidesDirty] = useState(false)
   const [docsDirty, setDocsDirty] = useState(false)
+  const [quizDirty, setQuizDirty] = useState(false)
   const [isDiscardOpen, setIsDiscardOpen] = useState(false)
 
   useEffect(() => {
@@ -188,7 +190,7 @@ export function TopicEditorPage({ onOpenAuth }: TopicEditorPageProps) {
     }
   }, [accessToken, courseId, reloadKey, topicId])
 
-  const isDirty = slidesDirty || docsDirty
+  const isDirty = slidesDirty || docsDirty || quizDirty
 
   useEffect(() => {
     if (!isDirty) {
@@ -236,6 +238,10 @@ export function TopicEditorPage({ onOpenAuth }: TopicEditorPageProps) {
 
   const handleDocsDirty = useCallback((dirty: boolean) => {
     setDocsDirty(dirty)
+  }, [])
+
+  const handleQuizDirty = useCallback((dirty: boolean) => {
+    setQuizDirty(dirty)
   }, [])
 
   const backHref = `/teacher/subjects/${courseId}`
@@ -339,6 +345,22 @@ export function TopicEditorPage({ onOpenAuth }: TopicEditorPageProps) {
                   onChanged={handleUploadChanged}
                 />
               </div>
+
+              <div
+                role="tabpanel"
+                id="topic-panel-quiz"
+                aria-labelledby="topic-tab-quiz"
+                hidden={activeTab !== 'quiz'}
+                className="mt-md"
+              >
+                <QuizEditorPanel
+                  key={workspace.topic.id}
+                  topicId={workspace.topic.id}
+                  accessToken={accessToken}
+                  isActive={activeTab === 'quiz'}
+                  onDirtyChange={handleQuizDirty}
+                />
+              </div>
             </>
           )}
         </TeacherAccessGate>
@@ -346,7 +368,7 @@ export function TopicEditorPage({ onOpenAuth }: TopicEditorPageProps) {
         {isDiscardOpen && (
           <ConfirmDialog
             title="Discard changes?"
-            description="Your unsaved slides or document changes will be lost."
+            description="Your unsaved slides, document, or quiz changes will be lost."
             confirmLabel="Discard"
             danger
             onConfirm={() => {

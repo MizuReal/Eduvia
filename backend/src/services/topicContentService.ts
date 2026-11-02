@@ -10,7 +10,6 @@ import {
   findFilesByIds,
   insertFile,
   listFilesForContent,
-  sumActiveFileBytesForUser,
 } from '../db/files.js'
 import { findTopicForInstructor } from '../db/courseOutline.js'
 import {
@@ -64,6 +63,7 @@ import {
 } from '../utils/files.js'
 import { validateUploadedFile } from './uploadService.js'
 import type { UploadPolicy } from './uploadService.js'
+import { assertStorageQuota } from './storageQuotaService.js'
 
 const EMPTY_DOCUMENT: TiptapDoc = {
   type: 'doc',
@@ -325,18 +325,6 @@ function validateReferences(
   return [...referencesById.keys()]
 }
 
-async function assertQuota(userId: string, incomingBytes: number): Promise<void> {
-  const usedBytes = await sumActiveFileBytesForUser(userId)
-
-  if (usedBytes + incomingBytes > env.USER_STORAGE_QUOTA_BYTES) {
-    throw new AppError(
-      413,
-      'STORAGE_QUOTA_EXCEEDED',
-      'Your storage quota is full. Delete a file and try again.',
-    )
-  }
-}
-
 async function storeUploadedFile(input: {
   user: AuthenticatedUser
   courseId: string
@@ -350,7 +338,7 @@ async function storeUploadedFile(input: {
 }> {
   const validated = await validateUploadedFile(input.file, input.policy)
 
-  await assertQuota(input.user.id, validated.sizeBytes)
+  await assertStorageQuota(input.user.id, validated.sizeBytes)
 
   const fileId = randomUUID()
   const originalName = sanitizeOriginalFilename(input.file.originalname)
@@ -595,7 +583,7 @@ export async function uploadPresentation(
     }
 
     const validated = await validateUploadedFile(file, 'presentation')
-    await assertQuota(user.id, validated.sizeBytes)
+    await assertStorageQuota(user.id, validated.sizeBytes)
 
     const originalName = sanitizeOriginalFilename(file.originalname)
     const title = requiredTitle(input.title, derivePresentationTitle(originalName))

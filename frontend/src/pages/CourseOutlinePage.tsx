@@ -1,5 +1,11 @@
 import { arrayMove } from '@dnd-kit/sortable'
-import { ArrowLeft, CheckCircle2, CircleAlert, RefreshCw } from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CircleAlert,
+  RefreshCw,
+  Users,
+} from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
@@ -13,6 +19,7 @@ import { TopicForm } from '../components/teacher/TopicForm'
 import { TrashPanel } from '../components/teacher/TrashPanel'
 import type { RestoredItem } from '../components/teacher/TrashPanel'
 import { Button } from '../components/ui/Button'
+import { buttonClasses } from '../components/ui/buttonStyles'
 import { courseTermLabel, yearLevelLabel } from '../config/course'
 import { useAuth } from '../context/AuthContext'
 import { FormAlert } from '../components/auth/FormAlert'
@@ -63,7 +70,7 @@ function OutlineSkeleton() {
 
 function NotFound() {
   return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
+    <div className="mt-xl max-w-card rounded-lg border border-hairline bg-surface p-lg shadow-soft">
       <CircleAlert
         className="size-5 text-accent-orange-deep"
         aria-hidden="true"
@@ -92,7 +99,7 @@ function OutlineError({
   return (
     <div
       role="alert"
-      className="mt-xl max-w-xl rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
+      className="mt-xl max-w-card rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
     >
       <CircleAlert
         className="size-5 text-accent-orange-deep"
@@ -515,6 +522,18 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
     setActionMessage(null)
   }
 
+  const openTopic = (topic: CourseTopic, tab?: 'quiz') => {
+    clearActionFeedback()
+
+    if (courseId) {
+      navigate(
+        `/teacher/subjects/${courseId}/topics/${topic.id}${
+          tab ? `?tab=${tab}` : ''
+        }`,
+      )
+    }
+  }
+
   return (
     <section
       aria-labelledby="course-outline-heading"
@@ -529,21 +548,33 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
           All subjects
         </Link>
 
-        <div className="mt-md max-w-3xl">
-          <span className="inline-flex items-center rounded-full bg-surface px-xs py-xxs text-eyebrow text-primary shadow-soft">
-            {outline?.code ?? 'Subject outline'}
-          </span>
-          <h1
-            id="course-outline-heading"
-            className="mt-md text-heading-2 sm:text-heading-1"
-          >
-            {outline?.name ?? 'Subject outline'}
-          </h1>
+        <div className="mt-md flex flex-wrap items-start justify-between gap-md">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center rounded-full bg-surface px-xs py-xxs text-eyebrow text-primary shadow-soft">
+              {outline?.code ?? 'Subject outline'}
+            </span>
+            <h1
+              id="course-outline-heading"
+              className="mt-md text-heading-2 sm:text-heading-1"
+            >
+              {outline?.name ?? 'Subject outline'}
+            </h1>
+            {outline && (
+              <p className="mt-sm text-body-md text-ink-muted">
+                {courseTermLabel(outline.term)} ·{' '}
+                {yearLevelLabel(outline.yearLevel)}
+              </p>
+            )}
+          </div>
+
           {outline && (
-            <p className="mt-sm text-body-md text-ink-muted">
-              {courseTermLabel(outline.term)} ·{' '}
-              {yearLevelLabel(outline.yearLevel)}
-            </p>
+            <Link
+              to={`/teacher/subjects/${outline.id}/students`}
+              className={buttonClasses('secondary', 'shrink-0')}
+            >
+              <Users className="size-4" aria-hidden="true" />
+              Students
+            </Link>
           )}
         </div>
 
@@ -595,13 +626,10 @@ export function CourseOutlinePage({ onOpenAuth }: CourseOutlinePageProps) {
                   setDeleteTarget({ kind: 'topic', topic })
                 }}
                 onManageContent={(topic) => {
-                  clearActionFeedback()
-
-                  if (courseId) {
-                    navigate(
-                      `/teacher/subjects/${courseId}/topics/${topic.id}`,
-                    )
-                  }
+                  openTopic(topic)
+                }}
+                onMakeQuiz={(topic) => {
+                  openTopic(topic, 'quiz')
                 }}
                 onMoveLesson={handleMoveLesson}
                 onEditLesson={(topicId, lesson) => {

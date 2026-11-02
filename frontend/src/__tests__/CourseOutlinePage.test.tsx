@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CourseOutlinePage } from '../pages/CourseOutlinePage'
 import { ApiError } from '../services/apiClient'
@@ -138,6 +138,12 @@ const newLesson = {
   updatedAt: timestamp,
 }
 
+function LocationProbe() {
+  const location = useLocation()
+
+  return <p>{`${location.pathname}${location.search}`}</p>
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={[`/teacher/subjects/${courseId}`]}>
@@ -145,6 +151,10 @@ function renderPage() {
         <Route
           path="/teacher/subjects/:courseId"
           element={<CourseOutlinePage onOpenAuth={vi.fn()} />}
+        />
+        <Route
+          path="/teacher/subjects/:courseId/topics/:topicId"
+          element={<LocationProbe />}
         />
       </Routes>
     </MemoryRouter>,
@@ -201,7 +211,7 @@ describe('CourseOutlinePage', () => {
     expect(within(tableOfContents).getByText('1 lesson')).toBeInTheDocument()
   })
 
-  it('shows a prominent manage content action for each topic', async () => {
+  it('shows prominent manage content and quiz actions for each topic', async () => {
     renderPage()
 
     const tableOfContents = await screen.findByRole('region', {
@@ -209,9 +219,53 @@ describe('CourseOutlinePage', () => {
     })
 
     expect(
+      within(tableOfContents).getAllByRole('button', {
+        name: 'Manage content',
+      }),
+    ).toHaveLength(1)
+    expect(
+      within(tableOfContents).getAllByRole('button', {
+        name: 'Make a quiz',
+      }),
+    ).toHaveLength(1)
+  })
+
+  it('opens the quiz tab from the make a quiz action', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const tableOfContents = await screen.findByRole('region', {
+      name: 'Table of contents',
+    })
+    const quizButtons = within(tableOfContents).getAllByRole('button', {
+      name: 'Make a quiz',
+    })
+
+    await user.click(quizButtons[0] as HTMLElement)
+
+    expect(
+      await screen.findByText(
+        `/teacher/subjects/${courseId}/topics/${topicId}?tab=quiz`,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps manage content on the topic editor default tab', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const tableOfContents = await screen.findByRole('region', {
+      name: 'Table of contents',
+    })
+
+    await user.click(
       within(tableOfContents).getByRole('button', {
         name: 'Manage content',
       }),
+    )
+
+    expect(
+      await screen.findByText(`/teacher/subjects/${courseId}/topics/${topicId}`),
     ).toBeInTheDocument()
   })
 

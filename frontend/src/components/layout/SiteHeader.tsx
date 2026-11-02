@@ -160,6 +160,11 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
                 Teacher
               </Link>
             )}
+            {profile?.role === 'student' && (
+              <Link to="/student" className={NAV_LINK_CLASSES}>
+                Student
+              </Link>
+            )}
           </nav>
           <AuthControls layout="desktop" onOpenAuth={onOpenAuth} />
         </div>
@@ -205,6 +210,15 @@ export function SiteHeader({ onOpenAuth }: SiteHeaderProps) {
                   onClick={closeMenu}
                 >
                   Teacher
+                </Link>
+              )}
+              {profile?.role === 'student' && (
+                <Link
+                  to="/student"
+                  className={NAV_LINK_CLASSES}
+                  onClick={closeMenu}
+                >
+                  Student
                 </Link>
               )}
               <div className="mt-xs border-t border-hairline pt-sm">

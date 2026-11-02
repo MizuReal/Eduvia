@@ -5,21 +5,31 @@ import type { Course, CourseTerm, YearLevel } from '../types/course.js'
 import type { CourseRow } from './database.types.js'
 import { supabaseAdmin } from './supabaseAdmin.js'
 
-const COURSE_COLUMNS =
-  'id, name, code, term, year_level, created_at, updated_at'
+export const COURSE_COLUMNS =
+  'id, name, code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
 
-type CourseSelectRow = Pick<
+export type CourseSelectRow = Pick<
   CourseRow,
-  'id' | 'name' | 'code' | 'term' | 'year_level' | 'created_at' | 'updated_at'
+  | 'id'
+  | 'name'
+  | 'code'
+  | 'term'
+  | 'year_level'
+  | 'enrollment_open'
+  | 'enrollment_mode'
+  | 'created_at'
+  | 'updated_at'
 >
 
-function toCourse(row: CourseSelectRow): Course {
+export function toCourse(row: CourseSelectRow): Course {
   return {
     id: row.id,
     name: row.name,
     code: row.code,
     term: row.term,
     yearLevel: row.year_level,
+    enrollmentOpen: row.enrollment_open,
+    enrollmentMode: row.enrollment_mode,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   }

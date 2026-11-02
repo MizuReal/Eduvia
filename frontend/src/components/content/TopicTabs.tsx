@@ -1,9 +1,9 @@
-import { FileText, Presentation, Upload } from 'lucide-react'
+import { FileText, ListChecks, Presentation, Upload } from 'lucide-react'
 import clsx from 'clsx'
 import { useRef } from 'react'
 import type { KeyboardEvent } from 'react'
 
-export type TopicTab = 'pptx' | 'docs' | 'upload'
+export type TopicTab = 'pptx' | 'docs' | 'upload' | 'quiz'
 
 const TABS: readonly {
   id: TopicTab
@@ -13,6 +13,7 @@ const TABS: readonly {
   { id: 'pptx', label: 'PPTX', icon: Presentation },
   { id: 'docs', label: 'Docs', icon: FileText },
   { id: 'upload', label: 'Upload', icon: Upload },
+  { id: 'quiz', label: 'Quiz', icon: ListChecks },
 ]
 
 type TopicTabsProps = {
@@ -57,7 +58,7 @@ export function TopicTabs({ activeTab, onChange }: TopicTabsProps) {
     <div
       role="tablist"
       aria-label="Topic content"
-      className="mt-lg flex gap-xxs border-b border-hairline"
+      className="mt-lg flex flex-wrap gap-xxs border-b border-hairline"
     >
       {TABS.map((tab, index) => {
         const isActive = tab.id === activeTab

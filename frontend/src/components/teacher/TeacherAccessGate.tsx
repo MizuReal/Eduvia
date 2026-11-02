@@ -27,7 +27,7 @@ function SignInGate({
   onOpenAuth,
 }: Pick<TeacherAccessGateProps, 'onOpenAuth'>) {
   return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
+    <div className="mt-xl max-w-card rounded-lg border border-hairline bg-surface p-lg shadow-soft">
       <span className="flex size-12 items-center justify-center rounded-lg bg-accent-purple">
         <BookOpen className="size-6 text-ink" aria-hidden="true" />
       </span>
@@ -48,7 +48,7 @@ function SignInGate({
 
 function AccessDenied() {
   return (
-    <div className="mt-xl max-w-xl rounded-lg border border-hairline bg-surface p-lg shadow-soft">
+    <div className="mt-xl max-w-card rounded-lg border border-hairline bg-surface p-lg shadow-soft">
       <span className="flex size-12 items-center justify-center rounded-lg bg-canvas-soft">
         <ShieldAlert className="size-6 text-ink-secondary" aria-hidden="true" />
       </span>
@@ -67,7 +67,7 @@ function ProfileError() {
   return (
     <div
       role="alert"
-      className="mt-xl flex max-w-xl items-start gap-xs rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
+      className="mt-xl flex max-w-card items-start gap-xs rounded-lg border border-accent-orange-deep/30 bg-surface p-lg"
     >
       <CircleAlert
         className="mt-xxs size-5 shrink-0 text-accent-orange-deep"

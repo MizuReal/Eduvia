@@ -6,6 +6,10 @@ import { SiteHeader } from './components/layout/SiteHeader'
 import { AuthProvider } from './context/AuthContext'
 import { CourseOutlinePage } from './pages/CourseOutlinePage'
 import HomePage from './pages/HomePage'
+import { StudentEnrollPage } from './pages/StudentEnrollPage'
+import { StudentPage } from './pages/StudentPage'
+import { StudentRosterPage } from './pages/StudentRosterPage'
+import { StudentSubjectPage } from './pages/StudentSubjectPage'
 import { TeacherPage } from './pages/TeacherPage'
 import type { AuthMode } from './types/auth'
 
@@ -67,6 +71,22 @@ function AppShell() {
                 <TopicEditorPage onOpenAuth={openAuth} />
               </Suspense>
             }
+          />
+          <Route
+            path="/teacher/subjects/:courseId/students"
+            element={<StudentRosterPage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/student"
+            element={<StudentPage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/student/enroll/:courseId"
+            element={<StudentEnrollPage onOpenAuth={openAuth} />}
+          />
+          <Route
+            path="/student/subjects/:courseId"
+            element={<StudentSubjectPage onOpenAuth={openAuth} />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

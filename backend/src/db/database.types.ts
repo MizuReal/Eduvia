@@ -30,6 +30,8 @@ export type CourseRow = {
   code: string
   term: CourseTerm
   year_level: YearLevel
+  enrollment_open: boolean
+  enrollment_mode: 'approval' | 'auto'
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -42,6 +44,8 @@ export type CourseInsert = {
   code: string
   term: CourseTerm
   year_level: YearLevel
+  enrollment_open?: boolean
+  enrollment_mode?: 'approval' | 'auto'
   deleted_at?: string | null
 }
 
@@ -101,6 +105,7 @@ export type FileRow = {
   height: number | null
   status: 'uploading' | 'processing' | 'ready' | 'failed' | 'quarantined'
   content_id: string | null
+  preview_html: string | null
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -122,6 +127,7 @@ export type FileInsert = {
   height?: number | null
   status?: FileRow['status']
   content_id?: string | null
+  preview_html?: string | null
   deleted_at?: string | null
 }
 
@@ -175,6 +181,92 @@ export type AuditLogInsert = {
   metadata?: Record<string, unknown>
 }
 
+export type QuizRow = {
+  id: string
+  course_id: string
+  topic_id: string
+  mode: 'native' | 'document'
+  title: string
+  instructions: string
+  passing_score: number
+  status: 'draft' | 'published'
+  version: number
+  file_id: string | null
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type QuizInsert = {
+  id?: string
+  course_id: string
+  topic_id: string
+  mode: QuizRow['mode']
+  title: string
+  instructions: string
+  passing_score: number
+  status?: QuizRow['status']
+  version?: number
+  file_id?: string | null
+  deleted_at?: string | null
+}
+
+export type QuizQuestionRow = {
+  id: string
+  quiz_id: string
+  order_index: number
+  prompt: string | null
+  option_a: string | null
+  option_b: string | null
+  option_c: string | null
+  option_d: string | null
+  correct_option: 'A' | 'B' | 'C' | 'D'
+  explanation: string | null
+  points: number
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type QuizQuestionInsert = {
+  id?: string
+  quiz_id: string
+  order_index: number
+  prompt?: string | null
+  option_a?: string | null
+  option_b?: string | null
+  option_c?: string | null
+  option_d?: string | null
+  correct_option: QuizQuestionRow['correct_option']
+  explanation?: string | null
+  points?: number
+  deleted_at?: string | null
+}
+
+export type EnrollmentRow = {
+  id: string
+  course_id: string
+  student_id: string
+  status: 'pending' | 'active' | 'rejected' | 'removed'
+  decided_by: string | null
+  decided_at: string | null
+  removed_by: string | null
+  removed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EnrollmentInsert = {
+  id?: string
+  course_id: string
+  student_id: string
+  status?: EnrollmentRow['status']
+  decided_by?: string | null
+  decided_at?: string | null
+  removed_by?: string | null
+  removed_at?: string | null
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -218,6 +310,24 @@ export type Database = {
         Row: AuditLogRow
         Insert: AuditLogInsert
         Update: Partial<AuditLogInsert>
+        Relationships: []
+      }
+      quizzes: {
+        Row: QuizRow
+        Insert: QuizInsert
+        Update: Partial<QuizInsert>
+        Relationships: []
+      }
+      quiz_questions: {
+        Row: QuizQuestionRow
+        Insert: QuizQuestionInsert
+        Update: Partial<QuizQuestionInsert>
+        Relationships: []
+      }
+      enrollments: {
+        Row: EnrollmentRow
+        Insert: EnrollmentInsert
+        Update: Partial<EnrollmentInsert>
         Relationships: []
       }
     }
@@ -273,6 +383,61 @@ export type Database = {
           target_actor_id: string
         }
         Returns: { contentId: string; fileId: string }
+      }
+      save_quiz: {
+        Args: {
+          target_quiz_id: string
+          new_title: string
+          new_instructions: string
+          new_passing_score: number
+          new_questions: unknown
+        }
+        Returns: undefined
+      }
+      publish_quiz: {
+        Args: {
+          target_quiz_id: string
+          target_actor_id: string
+        }
+        Returns: QuizRow
+      }
+      replace_quiz_paper: {
+        Args: {
+          target_quiz_id: string
+          target_course_id: string
+          target_topic_id: string
+          target_uploaded_by: string
+          target_bucket: string
+          target_storage_path: string
+          target_original_name: string
+          target_mime_type: string
+          target_size_bytes: number
+          target_checksum_sha256: string
+          target_preview_html: string | null
+          target_actor_id: string
+        }
+        Returns: { fileId: string }
+      }
+      remove_quiz_paper: {
+        Args: {
+          target_quiz_id: string
+          target_actor_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_quiz: {
+        Args: {
+          target_quiz_id: string
+          target_actor_id: string
+        }
+        Returns: undefined
+      }
+      request_enrollment: {
+        Args: {
+          target_course_id: string
+          target_student_id: string
+        }
+        Returns: EnrollmentRow
       }
       update_topic_content: {
         Args: {

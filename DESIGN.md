@@ -338,6 +338,8 @@ Notion's type voice is **tight, heavy, and quiet-confident**. Headlines lean on 
 ### Grid & Container
 Content is centred in a wide max-width column (~1080–1300px on desktop per the extracted breakpoints) with generous outer gutters. Feature sections alternate between full-width text blocks and 2-up / 3-up card grids; the pricing page widens to a 4-column plan table. The dark hero spans full-bleed edge to edge while body sections respect the centred container.
 
+Container widths use Tailwind's standard scale, with a named `{container.card}` 36rem token for narrow gate and error cards. Named container tokens are preferred over `max-w-xl` because the `{spacing.*}` scale shares those t-shirt suffixes and would override the width.
+
 ### Whitespace Philosophy
 Whitespace is the primary grouping device. Sections are separated by large vertical gaps rather than rules, and cards sit on the warm canvas with quiet hairlines instead of heavy frames. The effect is document-like: airy, scannable, and never crowded.
 
@@ -444,7 +446,7 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 **`content-toolbar`** — Formatting controls
 - A wrapping row of 44px icon buttons on `{colors.surface}`, divided by `{colors.hairline}` rules. Idle icons use `{colors.ink-muted}`; active marks use `{colors.ink}` on `{colors.canvas-soft}`. Focus uses the standard primary outline.
 
-**`content-tab`** — PPTX / Docs / Upload navigation
+**`content-tab`** — PPTX / Docs / Upload / Quiz navigation
 - Link-based tabs with `{typography.body-sm}` and a 2px active underline in `{colors.primary}`. Inactive labels use `{colors.ink-muted}`. Counts use `{typography.caption}`.
 
 **`slide-rail`** — Ordered slide list
@@ -455,6 +457,33 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 
 **`asset-card`** — Embedded image / file node
 - Images sit in a `{rounded.lg}` frame with a `{colors.hairline}` border. File attachments use a white card with a `{colors.canvas-soft}` icon well, `{typography.body-sm}` name, `{typography.caption}` metadata, and a utility open action. Unavailable assets show an icon plus explanatory text and a retry action.
+
+**`quiz-mode-choice`** — Native vs uploaded-paper choice
+- Two equal `{rounded.lg}` cards on `{colors.surface}` with a `{colors.hairline}` border. The icon sits in a 44px `{colors.canvas-soft}` well; the title uses `{typography.title}` and the description `{typography.body-sm}` in `{colors.ink-muted}`. Hover lifts the border toward `{colors.primary}`; focus uses the standard primary outline. Cards stack on mobile.
+
+**`quiz-question-card`** — Native question editor row
+- White `{colors.surface}` card with a `{colors.hairline}` border, `{rounded.lg}` corners, `{spacing.lg}` padding, and the Level-1 soft shadow. Prompt and options use `text-input`; the correct-answer selector is a four-item A–D radio group with 44px targets. Reorder, duplicate, and delete actions are 44px utility icon buttons aligned to the card header.
+
+**`answer-key-grid`** — Document quiz A–D key
+- A bordered list of numbered rows on `{colors.surface}`. Each row pairs `{typography.body-sm}` "Question N" with a four-item A–D radio group; selected state uses `{colors.primary}` plus a visible check, never colour alone. Rows keep a 44px control height and wrap on mobile.
+
+**`quiz-status-badge`** — Draft / published state
+- Pill `{rounded.full}` with `{typography.eyebrow}`. Draft uses `{colors.canvas-soft}`, `{colors.ink-muted}`, and a pencil icon; published uses `{colors.canvas-soft}`, `{colors.ink}`, and a check icon in `{colors.accent-green}`. The icon and text both carry the state.
+
+**`quiz-paper-preview`** — Uploaded paper surface
+- PDFs render in an inline frame from a short-lived signed URL; DOCX previews render sanitized HTML in a sandboxed iframe on `{colors.surface}` with `{rounded.lg}` corners and a `{colors.hairline}` border. Preview dialogs reuse `ex-modal-card`, cap height at the viewport, and keep download/replace actions in the header.
+
+**`enrollment-settings-card`** — Subject enrollment controls
+- White `{colors.surface}` card with `{colors.hairline}` border, `{rounded.lg}` corners, `{spacing.lg}` padding, and the Level-1 soft shadow. The open-enrollment switch uses `{colors.primary}` when on and `{colors.canvas-soft}` when off, with a 44px hit area. Mode options are two bordered radio cards; the selected card uses `{colors.primary}` plus a visible radio mark. The invite link is shown in `{typography.caption}` with a copy utility button.
+
+**`enrollment-roster-row`** — Pending or enrolled student
+- A `{colors.surface}` row with `{colors.hairline}` border and `{rounded.md}` corners. Shows `@username` in `{typography.body-sm}`, faculty and date in `{typography.caption}`, and 44px Approve/Reject or Remove utility actions. Pending rows use `{colors.canvas-soft}` to distinguish them from active students.
+
+**`student-subject-card`** — Student dashboard subject
+- White `{colors.surface}` card with `{colors.hairline}` border, `{rounded.lg}` corners, and `{spacing.md}` padding. Course code sits in a `{colors.canvas-soft}` pill, the title uses `{typography.title}`, and term/year/teacher use `{typography.caption}`. Pending subjects use `{colors.canvas-soft}` and a clock icon plus “Waiting for approval” text.
+
+**`student-toc`** — Read-only subject table of contents
+- Topics use numbered `{colors.canvas-soft}` markers and `{typography.title}` headings. Lessons sit on a `{colors.hairline}` left rule in `{typography.body-sm}`. The surface is read-only: no editor chrome, drag handles, or management actions.
 
 ### Signature Components
 
