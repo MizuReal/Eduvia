@@ -225,6 +225,7 @@ function TopicCard({
                     key={lesson.id}
                     topicId={topic.id}
                     lesson={lesson}
+                    topicNumber={index + 1}
                     index={lessonIndex}
                     lessonCount={topic.lessons.length}
                     onMoveLesson={onMoveLesson}
@@ -244,6 +245,7 @@ function TopicCard({
 type LessonRowProps = {
   topicId: string
   lesson: Lesson
+  topicNumber: number
   index: number
   lessonCount: number
   onMoveLesson: (topicId: string, lesson: Lesson, offset: number) => void
@@ -254,6 +256,7 @@ type LessonRowProps = {
 function LessonRow({
   topicId,
   lesson,
+  topicNumber,
   index,
   lessonCount,
   onMoveLesson,
@@ -292,7 +295,9 @@ function LessonRow({
         <GripVertical className="size-4" aria-hidden="true" />
       </button>
 
-      <span className="text-eyebrow text-ink-faint">{index + 1}</span>
+      <span className="w-8 shrink-0 text-eyebrow tabular-nums text-ink-faint">
+        {topicNumber}.{index + 1}
+      </span>
       <span className="min-w-0 flex-1">{lesson.title}</span>
 
       <div className="flex items-center gap-xxs">

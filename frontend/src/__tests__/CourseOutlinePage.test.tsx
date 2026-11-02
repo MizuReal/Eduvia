@@ -212,7 +212,20 @@ describe('CourseOutlinePage', () => {
     expect(
       within(tableOfContents).getByText('Semantic HTML'),
     ).toBeInTheDocument()
+    expect(within(tableOfContents).getByText('1.1')).toBeInTheDocument()
     expect(within(tableOfContents).getByText('1 lesson')).toBeInTheDocument()
+  })
+
+  it('numbers lessons under their parent topic', async () => {
+    outlineMocks.getCourseOutline.mockResolvedValue(outlineWithTwoLessons)
+    renderPage()
+
+    const tableOfContents = await screen.findByRole('region', {
+      name: 'Table of contents',
+    })
+
+    expect(within(tableOfContents).getByText('1.1')).toBeInTheDocument()
+    expect(within(tableOfContents).getByText('1.2')).toBeInTheDocument()
   })
 
   it('shows prominent manage content, quiz, and results actions for each topic', async () => {
