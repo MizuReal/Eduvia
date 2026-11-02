@@ -4,6 +4,7 @@ import { AuthModal } from './components/auth/AuthModal'
 import { SiteFooter } from './components/layout/SiteFooter'
 import { SiteHeader } from './components/layout/SiteHeader'
 import { AuthProvider } from './context/AuthContext'
+import { ToastProvider } from './components/ui/ToastProvider'
 import { CourseOutlinePage } from './pages/CourseOutlinePage'
 import HomePage from './pages/HomePage'
 import { StudentEnrollPage } from './pages/StudentEnrollPage'
@@ -126,7 +127,9 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppShell />
+        <ToastProvider>
+          <AppShell />
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

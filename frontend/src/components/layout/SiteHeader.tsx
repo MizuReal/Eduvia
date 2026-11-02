@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { messageForAuthError } from '../auth/errors'
 import { Button } from '../ui/Button'
+import { useToast } from '../ui/toastContext'
 import type { AuthMode } from '../../types/auth'
 import { useAuth } from '../../context/AuthContext'
 import { Container } from './Container'
@@ -25,6 +26,7 @@ type AuthControlsProps = {
 
 function AuthControls({ layout, onOpenAuth }: AuthControlsProps) {
   const { status, profile, profileError, signOut } = useAuth()
+  const { showToast } = useToast()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
   const isMobile = layout === 'mobile'
@@ -42,6 +44,7 @@ function AuthControls({ layout, onOpenAuth }: AuthControlsProps) {
 
     try {
       await signOut()
+      showToast('You have been signed out.')
     } catch (error) {
       setSignOutError(messageForAuthError(error))
     } finally {

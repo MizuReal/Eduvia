@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { AuthMode } from '../../types/auth'
+import { useToast } from '../ui/toastContext'
 import { LoginForm } from './LoginForm'
 import { RegisterForm } from './RegisterForm'
 import { SWITCH_BUTTON_CLASSES } from './formStyles'
@@ -20,6 +21,16 @@ export function AuthModal({
 }: AuthModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const isRegister = mode === 'register'
+  const { showToast } = useToast()
+
+  const handleFormSuccess = () => {
+    showToast(
+      isRegister
+        ? 'You are now registered. Welcome to Eduvia!'
+        : 'Welcome back! You are signed in.',
+    )
+    onClose()
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -117,9 +128,9 @@ export function AuthModal({
           </div>
 
           {isRegister ? (
-            <RegisterForm onSuccess={onClose} />
+            <RegisterForm onSuccess={handleFormSuccess} />
           ) : (
-            <LoginForm onSuccess={onClose} />
+            <LoginForm onSuccess={handleFormSuccess} />
           )}
 
           <p className="mt-lg border-t border-hairline pt-md text-body-sm text-ink-muted">

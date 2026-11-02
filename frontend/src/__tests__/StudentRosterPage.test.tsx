@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StudentRosterPage } from '../pages/StudentRosterPage'
+import { ToastProvider } from '../components/ui/ToastProvider'
 
 const authState = vi.hoisted(() => ({
   current: {
@@ -87,14 +88,16 @@ const workspace = {
 
 function renderRoster() {
   return render(
-    <MemoryRouter initialEntries={[`/teacher/subjects/${courseId}/students`]}>
-      <Routes>
-        <Route
-          path="/teacher/subjects/:courseId/students"
-          element={<StudentRosterPage onOpenAuth={vi.fn()} />}
-        />
-      </Routes>
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[`/teacher/subjects/${courseId}/students`]}>
+        <Routes>
+          <Route
+            path="/teacher/subjects/:courseId/students"
+            element={<StudentRosterPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>,
   )
 }
 
@@ -153,6 +156,9 @@ describe('StudentRosterPage', () => {
         'test-token',
       )
     })
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Enrollment settings saved.',
+    )
   })
 
   it('approves a pending request', async () => {
@@ -169,6 +175,7 @@ describe('StudentRosterPage', () => {
         'test-token',
       )
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Student approved.')
   })
 
   it('links enrolled students to their quiz results', async () => {
@@ -212,5 +219,8 @@ describe('StudentRosterPage', () => {
         'test-token',
       )
     })
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Student removed from this subject.',
+    )
   })
 })

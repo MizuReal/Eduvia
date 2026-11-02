@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthModal } from '../components/auth/AuthModal'
+import { ToastProvider } from '../components/ui/ToastProvider'
 import { ApiError } from '../services/apiClient'
 import { AuthError } from '../services/authErrors'
 import type { AuthMode } from '../types/auth'
@@ -19,12 +20,14 @@ function renderModal(mode: AuthMode) {
   const onModeChange = vi.fn()
 
   render(
-    <AuthModal
-      isOpen
-      mode={mode}
-      onClose={onClose}
-      onModeChange={onModeChange}
-    />,
+    <ToastProvider>
+      <AuthModal
+        isOpen
+        mode={mode}
+        onClose={onClose}
+        onModeChange={onModeChange}
+      />
+    </ToastProvider>,
   )
 
   return {
@@ -123,6 +126,9 @@ describe('AuthModal', () => {
       })
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'You are now registered. Welcome to Eduvia!',
+    )
   })
 
   it('reveals the teacher code and submits an instructor registration', async () => {
@@ -170,6 +176,30 @@ describe('AuthModal', () => {
       })
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'You are now registered. Welcome to Eduvia!',
+    )
+  })
+
+  it('shows a welcome back toast after login', async () => {
+    const user = userEvent.setup()
+    const { dialog, onClose } = renderModal('login')
+    authMocks.signIn.mockResolvedValue(undefined)
+
+    await user.type(within(dialog).getByLabelText('Username'), 'juan')
+    await user.type(
+      within(dialog).getByLabelText('Password'),
+      'Secret123!',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => {
+      expect(authMocks.signIn).toHaveBeenCalledWith('juan', 'Secret123!')
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Welcome back! You are signed in.',
+    )
   })
 
   it('hides the teacher code when switching back to student', async () => {

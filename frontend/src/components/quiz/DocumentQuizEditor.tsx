@@ -11,6 +11,7 @@ import {
 } from '../auth/formStyles'
 import { ConfirmDeleteDialog } from '../teacher/ConfirmDeleteDialog'
 import { Button } from '../ui/Button'
+import { useToast } from '../ui/toastContext'
 import {
   MIN_QUIZ_QUESTIONS,
   QUIZ_INSTRUCTIONS_MAX_LENGTH,
@@ -64,6 +65,7 @@ export function DocumentQuizEditor({
   onDeleted,
   onDirtyChange,
 }: DocumentQuizEditorProps) {
+  const { showToast } = useToast()
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -132,6 +134,7 @@ export function DocumentQuizEditor({
 
       onUpdated(saved)
       reset(toFormValues(saved))
+      showToast('Quiz saved.')
       return saved
     } catch (error) {
       setServerError(
@@ -164,6 +167,7 @@ export function DocumentQuizEditor({
       const published = await publishQuiz(saved.id, accessToken)
       onUpdated(published)
       reset(toFormValues(published))
+      showToast('Quiz published.')
     } catch (error) {
       setServerError(
         error instanceof ApiError
@@ -350,6 +354,7 @@ export function DocumentQuizEditor({
           onConfirm={async () => {
             await deleteQuiz(quiz.id, accessToken)
             setIsDeleting(false)
+            showToast('Quiz deleted.')
             onDeleted()
           }}
           onClose={() => setIsDeleting(false)}

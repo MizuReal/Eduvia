@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DocumentQuizEditor } from '../components/quiz/DocumentQuizEditor'
 import { NativeQuizEditor } from '../components/quiz/NativeQuizEditor'
+import { ToastProvider } from '../components/ui/ToastProvider'
 import type { Quiz } from '../types/quiz'
+import type { ReactNode } from 'react'
 
 const quizMocks = vi.hoisted(() => ({
   saveQuiz: vi.fn(),
@@ -53,6 +55,10 @@ function buildQuiz(overrides: Partial<Quiz> = {}): Quiz {
 }
 
 describe('quiz authoring forms', () => {
+  function renderEditor(editor: ReactNode) {
+    return render(<ToastProvider>{editor}</ToastProvider>)
+  }
+
   beforeEach(() => {
     Object.values(quizMocks).forEach((mock) => mock.mockReset())
     quizMocks.saveQuiz.mockImplementation((_id, input) =>
@@ -67,7 +73,7 @@ describe('quiz authoring forms', () => {
     const user = userEvent.setup()
     const onUpdated = vi.fn()
 
-    render(
+    renderEditor(
       <NativeQuizEditor
         quiz={buildQuiz()}
         accessToken="test-token"
@@ -97,12 +103,13 @@ describe('quiz authoring forms', () => {
       )
     })
     expect(onUpdated).toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent('Quiz saved.')
   })
 
   it('adds a native question before saving', async () => {
     const user = userEvent.setup()
 
-    render(
+    renderEditor(
       <NativeQuizEditor
         quiz={buildQuiz()}
         accessToken="test-token"
@@ -146,7 +153,7 @@ describe('quiz authoring forms', () => {
     const user = userEvent.setup()
     quizMocks.saveQuiz.mockResolvedValue(buildQuiz({ questions: [] }))
 
-    render(
+    renderEditor(
       <NativeQuizEditor
         quiz={buildQuiz({ questions: [] })}
         accessToken="test-token"
@@ -169,7 +176,7 @@ describe('quiz authoring forms', () => {
   it('requires every answer-key row before saving', async () => {
     const user = userEvent.setup()
 
-    render(
+    renderEditor(
       <DocumentQuizEditor
         quiz={buildQuiz({ mode: 'document', questions: [] })}
         accessToken="test-token"
@@ -190,7 +197,7 @@ describe('quiz authoring forms', () => {
   it('saves a complete A-D answer key', async () => {
     const user = userEvent.setup()
 
-    render(
+    renderEditor(
       <DocumentQuizEditor
         quiz={buildQuiz({
           mode: 'document',
@@ -224,5 +231,6 @@ describe('quiz authoring forms', () => {
         'test-token',
       )
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Quiz saved.')
   })
 })

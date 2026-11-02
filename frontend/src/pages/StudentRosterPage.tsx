@@ -19,6 +19,7 @@ import { FormAlert } from '../components/auth/FormAlert'
 import { TeacherAccessGate } from '../components/teacher/TeacherAccessGate'
 import { Button } from '../components/ui/Button'
 import { buttonClasses } from '../components/ui/buttonStyles'
+import { useToast } from '../components/ui/toastContext'
 import {
   ENROLLMENT_MODE_OPTIONS,
   courseTermLabel,
@@ -291,6 +292,7 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
   const { courseId } = useParams<{ courseId: string }>()
   const { session } = useAuth()
   const accessToken = session?.access_token
+  const { showToast } = useToast()
   const [workspace, setWorkspace] =
     useState<CourseEnrollmentWorkspace | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -335,12 +337,14 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
   const runAction = async (
     enrollmentId: string,
     action: () => Promise<CourseEnrollmentWorkspace>,
+    successMessage: string,
   ) => {
     setBusyEnrollment(enrollmentId)
     setActionError(null)
 
     try {
       setWorkspace(await action())
+      showToast(successMessage)
     } catch (error) {
       setActionError(
         error instanceof ApiError
@@ -364,6 +368,7 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
       setWorkspace(
         await updateEnrollmentSettings(courseId, { open, mode }, accessToken),
       )
+      showToast('Enrollment settings saved.')
     } catch (error) {
       setActionError(
         error instanceof ApiError
@@ -463,13 +468,25 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
                           }
                           resultsHref={null}
                           onApprove={() =>
-                            void runAction(enrollment.id, () =>
-                              approveEnrollment(enrollment.id, accessToken ?? ''),
+                            void runAction(
+                              enrollment.id,
+                              () =>
+                                approveEnrollment(
+                                  enrollment.id,
+                                  accessToken ?? '',
+                                ),
+                              'Student approved.',
                             )
                           }
                           onReject={() =>
-                            void runAction(enrollment.id, () =>
-                              rejectEnrollment(enrollment.id, accessToken ?? ''),
+                            void runAction(
+                              enrollment.id,
+                              () =>
+                                rejectEnrollment(
+                                  enrollment.id,
+                                  accessToken ?? '',
+                                ),
+                              'Student request rejected.',
                             )
                           }
                           onRemove={() => setRemoveTarget(enrollment)}
@@ -546,8 +563,10 @@ export function StudentRosterPage({ onOpenAuth }: StudentRosterPageProps) {
                 return
               }
 
-              void runAction(target.id, () =>
-                removeEnrollment(target.id, accessToken ?? ''),
+              void runAction(
+                target.id,
+                () => removeEnrollment(target.id, accessToken ?? ''),
+                'Student removed from this subject.',
               )
             }}
             onClose={() => setRemoveTarget(null)}

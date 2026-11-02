@@ -141,6 +141,9 @@ These are stated once, here. Every other section assumes them.
   browser.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
+- Transient success confirmations use the shared toast: `role="status"`, polite announcement,
+  five-second auto-dismiss, and a manual dismiss control. Field validation and load errors stay
+  inline; persistent save states are not duplicated as toasts.
 - Styling: Tailwind utilities composed from `DESIGN.md` tokens. No CSS modules, no CSS-in-JS.
   Dynamic layout values (percentages, chart and progress dimensions) may use `style={{}}`;
   nothing else is inline.

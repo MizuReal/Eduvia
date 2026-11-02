@@ -11,6 +11,7 @@ import {
 } from '../auth/formStyles'
 import { ConfirmDeleteDialog } from '../teacher/ConfirmDeleteDialog'
 import { Button } from '../ui/Button'
+import { useToast } from '../ui/toastContext'
 import {
   MAX_QUIZ_QUESTIONS,
   MIN_QUIZ_QUESTIONS,
@@ -77,6 +78,7 @@ export function NativeQuizEditor({
   onDeleted,
   onDirtyChange,
 }: NativeQuizEditorProps) {
+  const { showToast } = useToast()
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
@@ -142,6 +144,7 @@ export function NativeQuizEditor({
 
       onUpdated(saved)
       reset(toFormValues(saved))
+      showToast('Quiz saved.')
       return saved
     } catch (error) {
       setServerError(
@@ -179,6 +182,7 @@ export function NativeQuizEditor({
       const published = await publishQuiz(saved.id, accessToken)
       onUpdated(published)
       reset(toFormValues(published))
+      showToast('Quiz published.')
     } catch (error) {
       setServerError(
         error instanceof ApiError
@@ -393,6 +397,7 @@ export function NativeQuizEditor({
           onConfirm={async () => {
             await deleteQuiz(quiz.id, accessToken)
             setIsDeleting(false)
+            showToast('Quiz deleted.')
             onDeleted()
           }}
           onClose={() => setIsDeleting(false)}
