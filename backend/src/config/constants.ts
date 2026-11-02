@@ -17,6 +17,8 @@ export const COURSE_TERMS = [
 ] as const
 export const YEAR_LEVELS = [1, 2, 3, 4] as const
 export const COURSE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,19}$/i
+export const CLASS_CODE_LENGTH = 6
+export const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{6}$/
 export const COURSE_NAME_MIN_LENGTH = 3
 export const COURSE_NAME_MAX_LENGTH = 120
 export const COURSE_CODE_MIN_LENGTH = 3
@@ -31,6 +33,7 @@ export const MAX_GENERATED_CODE_ATTEMPTS = 20
 
 export const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 export const AUTH_RATE_LIMIT_MAX = 10
+export const JOIN_CODE_RATE_LIMIT_MAX = 30
 export const JSON_BODY_LIMIT = '1mb'
 
 export const COURSE_FILES_BUCKET = 'course-files'

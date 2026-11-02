@@ -105,6 +105,7 @@ vi.mock('../src/db/courseOutline.js', () => ({
 }))
 
 vi.mock('../src/db/courses.js', () => ({
+  findCourseIdByJoinCode: vi.fn(),
   findCourseForInstructor: vi.fn(),
   insertCourse: vi.fn(),
   listCourseCodesForScope: vi.fn(),

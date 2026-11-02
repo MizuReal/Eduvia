@@ -7,6 +7,10 @@ import type {
 import type { EnrollmentMode } from '../config/course'
 import { deleteAuth, get, patchAuth, postAuth } from './apiClient'
 
+export type ClassCodeLookup = {
+  courseId: string
+}
+
 export function getStudentDashboard(
   accessToken: string,
 ): Promise<StudentDashboard> {
@@ -30,6 +34,17 @@ export function requestEnrollment(
   return postAuth<EnrollmentJoinPreview>(
     '/api/enrollments',
     { courseId },
+    accessToken,
+  )
+}
+
+export function lookupClassCode(
+  code: string,
+  accessToken: string,
+): Promise<ClassCodeLookup> {
+  return postAuth<ClassCodeLookup>(
+    '/api/enrollments/join-code',
+    { code },
     accessToken,
   )
 }

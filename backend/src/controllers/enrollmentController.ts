@@ -5,6 +5,7 @@ import {
   courseIdEnrollmentParamSchema,
   createEnrollmentSchema,
   enrollmentIdParamSchema,
+  joinClassCodeSchema,
   updateEnrollmentSettingsSchema,
 } from '../schemas/enrollment.js'
 import {
@@ -16,6 +17,7 @@ import {
   rejectEnrollment as rejectEnrollmentService,
   removeEnrollment as removeEnrollmentService,
   requestEnrollment as requestEnrollmentService,
+  resolveClassCode as resolveClassCodeService,
   updateEnrollmentSettings as updateEnrollmentSettingsService,
 } from '../services/enrollmentService.js'
 import { requireAuthenticatedUser } from '../utils/authUser.js'
@@ -57,6 +59,21 @@ export async function getEnrollmentJoinPreviewHandler(
   )
 
   res.status(200).json({ data: preview, error: null })
+}
+
+export async function resolveClassCodeHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const body = joinClassCodeSchema.safeParse(req.body)
+
+  if (!body.success) {
+    throw validationError(body.error)
+  }
+
+  const result = await resolveClassCodeService(body.data.code)
+
+  res.status(200).json({ data: result, error: null })
 }
 
 export async function createEnrollmentHandler(

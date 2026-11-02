@@ -1,19 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import {
   ArrowRight,
   BookOpen,
   CircleAlert,
   Clock3,
   GraduationCap,
+  KeyRound,
   RefreshCw,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
+import { FieldError } from '../components/auth/FieldError'
+import { FIELD_INPUT_CLASSES } from '../components/auth/formStyles'
 import { StudentAccessGate } from '../components/student/StudentAccessGate'
 import { Button } from '../components/ui/Button'
-import { courseTermLabel, yearLevelLabel } from '../config/course'
+import {
+  CLASS_CODE_LENGTH,
+  CLASS_CODE_PATTERN,
+  courseTermLabel,
+  yearLevelLabel,
+} from '../config/course'
 import { useAuth } from '../context/AuthContext'
-import { getStudentDashboard } from '../services/enrollmentService'
+import { ApiError } from '../services/apiClient'
+import {
+  getStudentDashboard,
+  lookupClassCode,
+} from '../services/enrollmentService'
 import type { StudentDashboard, StudentEnrollment } from '../types/enrollment'
 import type { AuthMode } from '../types/auth'
 
@@ -34,10 +47,123 @@ function PageHeading() {
         My subjects
       </h1>
       <p className="mt-sm text-body-md text-ink-muted">
-        Open your enrolled subjects and follow their topics and lessons. Use the
-        invite link from your teacher to join another subject.
+        Open your enrolled subjects and follow their topics and lessons. Use a
+        class code or the invite link from your teacher to join another subject.
       </p>
     </div>
+  )
+}
+
+function JoinWithCodeCard({ accessToken }: { accessToken: string }) {
+  const navigate = useNavigate()
+  const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleCodeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, CLASS_CODE_LENGTH)
+
+    setCode(next)
+    setError(null)
+  }
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (isSubmitting) {
+      return
+    }
+
+    const normalized = code.trim().toUpperCase()
+
+    if (!CLASS_CODE_PATTERN.test(normalized)) {
+      setError(`Enter the ${CLASS_CODE_LENGTH}-character class code.`)
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const result = await lookupClassCode(normalized, accessToken)
+      navigate(`/student/enroll/${result.courseId}`)
+    } catch (error) {
+      setError(
+        error instanceof ApiError && error.code === 'CLASS_CODE_NOT_FOUND'
+          ? 'No subject matches that class code. Check the code and try again.'
+          : error instanceof ApiError
+            ? error.message
+            : 'We could not look up that class code. Try again.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="join-code-heading"
+      className="mt-lg rounded-lg border border-hairline bg-surface p-lg shadow-soft"
+    >
+      <div className="flex items-start gap-sm">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-sky text-ink">
+          <KeyRound className="size-5" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 id="join-code-heading" className="text-title text-ink">
+            Join with a class code
+          </h2>
+          <p className="mt-xxs text-body-sm text-ink-muted">
+            Enter the {CLASS_CODE_LENGTH}-character code your teacher shared.
+          </p>
+        </div>
+      </div>
+
+      <form
+        noValidate
+        onSubmit={submit}
+        className="mt-md flex flex-col items-start gap-sm sm:flex-row"
+      >
+        <div className="w-full min-w-0 flex-1">
+          <label htmlFor="class-code" className="sr-only">
+            Class code
+          </label>
+          <input
+            id="class-code"
+            name="classCode"
+            type="text"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            maxLength={CLASS_CODE_LENGTH}
+            placeholder="ABC123"
+            value={code}
+            onChange={handleCodeChange}
+            aria-invalid={Boolean(error)}
+            aria-describedby={
+              error ? 'class-code-hint class-code-error' : 'class-code-hint'
+            }
+            className={`${FIELD_INPUT_CLASSES} uppercase tracking-widest`}
+          />
+          <p id="class-code-hint" className="mt-xxs text-caption text-ink-muted">
+            Ask your teacher for the code if you do not have one.
+          </p>
+          <FieldError id="class-code-error" message={error ?? undefined} />
+        </div>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isSubmitting || code.length === 0}
+          className="shrink-0"
+        >
+          {isSubmitting ? 'Checking…' : 'Continue'}
+          <ArrowRight className="size-4" aria-hidden="true" />
+        </Button>
+      </form>
+    </section>
   )
 }
 
@@ -157,7 +283,8 @@ function Dashboard({
         />
         <h2 className="mt-sm text-title text-ink">No subjects yet</h2>
         <p className="mt-xxs text-body-sm text-ink-muted">
-          Open the invite link your teacher shared to request enrollment.
+          Enter your class code above or open the invite link your teacher
+          shared to request enrollment.
         </p>
       </div>
     )
@@ -247,6 +374,7 @@ export function StudentPage({ onOpenAuth }: StudentPageProps) {
       <Container>
         <PageHeading />
         <StudentAccessGate onOpenAuth={onOpenAuth}>
+          {accessToken && <JoinWithCodeCard accessToken={accessToken} />}
           <Dashboard
             dashboard={dashboard}
             isLoading={isLoading}

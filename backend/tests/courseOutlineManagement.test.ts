@@ -42,6 +42,7 @@ const {
 }))
 
 vi.mock('../src/db/courses.js', () => ({
+  findCourseIdByJoinCode: vi.fn(),
   findCourseForInstructor: findCourseForInstructorMock,
   insertCourse: vi.fn(),
   listCourseCodesForScope: vi.fn(),

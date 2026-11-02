@@ -5,6 +5,7 @@ import {
   Check,
   CircleAlert,
   Copy,
+  KeyRound,
   Link2,
   RefreshCw,
   ShieldCheck,
@@ -94,6 +95,7 @@ function SettingsCard({
   const [open, setOpen] = useState(workspace.course.enrollmentOpen)
   const [mode, setMode] = useState(workspace.course.enrollmentMode)
   const [copied, setCopied] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
   const inviteLink = `${window.location.origin}/student/enroll/${workspace.course.id}`
 
   useEffect(() => {
@@ -111,6 +113,16 @@ function SettingsCard({
     }
   }
 
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(workspace.course.joinCode)
+      setCopiedCode(true)
+      window.setTimeout(() => setCopiedCode(false), COPY_FEEDBACK_MS)
+    } catch {
+      setCopiedCode(false)
+    }
+  }
+
   return (
     <section
       aria-labelledby="enrollment-settings-heading"
@@ -122,18 +134,43 @@ function SettingsCard({
             Enrollment settings
           </h2>
           <p className="mt-xxs text-body-sm text-ink-muted">
-            Share the invite link with your students. Closed subjects keep their
-            current students.
+            Share the invite link or class code with your students. Closed
+            subjects keep their current students.
           </p>
         </div>
         <ShieldCheck className="size-5 shrink-0 text-ink-faint" aria-hidden="true" />
+      </div>
+
+      <div className="mt-md rounded-md border border-hairline bg-canvas-soft p-sm">
+        <div className="flex flex-wrap items-center justify-between gap-sm">
+          <div>
+            <p className="flex items-center gap-xxs text-eyebrow uppercase tracking-wide text-ink-muted">
+              <KeyRound className="size-3.5" aria-hidden="true" />
+              Class code
+            </p>
+            <p className="mt-xxs text-heading-3 tracking-widest text-ink">
+              {workspace.course.joinCode}
+            </p>
+          </div>
+          <Button variant="utility" onClick={() => void copyCode()}>
+            {copiedCode ? (
+              <Check className="size-4 text-accent-green" aria-hidden="true" />
+            ) : (
+              <Copy className="size-4" aria-hidden="true" />
+            )}
+            {copiedCode ? 'Code copied' : 'Copy code'}
+          </Button>
+        </div>
+        <p className="mt-xxs text-caption text-ink-muted">
+          Students enter this on their student dashboard.
+        </p>
       </div>
 
       <div className="mt-md flex items-center justify-between gap-md rounded-md border border-hairline bg-canvas-soft p-sm">
         <div>
           <p className="text-body-sm font-medium text-ink">Open enrollment</p>
           <p className="text-caption text-ink-muted">
-            Allow new students to join through the invite link.
+            Allow new students to join through the invite link or class code.
           </p>
         </div>
         <button

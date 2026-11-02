@@ -6,13 +6,14 @@ import type { CourseRow } from './database.types.js'
 import { supabaseAdmin } from './supabaseAdmin.js'
 
 export const COURSE_COLUMNS =
-  'id, name, code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
+  'id, name, code, join_code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
 
 export type CourseSelectRow = Pick<
   CourseRow,
   | 'id'
   | 'name'
   | 'code'
+  | 'join_code'
   | 'term'
   | 'year_level'
   | 'enrollment_open'
@@ -26,6 +27,7 @@ export function toCourse(row: CourseSelectRow): Course {
     id: row.id,
     name: row.name,
     code: row.code,
+    joinCode: row.join_code,
     term: row.term,
     yearLevel: row.year_level,
     enrollmentOpen: row.enrollment_open,
@@ -57,6 +59,28 @@ export async function findCourseForInstructor(
   }
 
   return data ? toCourse(data) : null
+}
+
+export async function findCourseIdByJoinCode(
+  joinCode: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from('courses')
+    .select('id')
+    .eq('join_code', joinCode)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) {
+    logger.error({ err: error }, 'Course join code lookup failed')
+    throw new AppError(
+      503,
+      'COURSE_LOOKUP_FAILED',
+      'We could not look up that class code. Try again.',
+    )
+  }
+
+  return data?.id ?? null
 }
 
 export async function listCoursesByInstructor(

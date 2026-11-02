@@ -34,6 +34,7 @@ export type CourseRow = {
   instructor_id: string
   name: string
   code: string
+  join_code: string
   term: CourseTerm
   year_level: YearLevel
   enrollment_open: boolean
@@ -48,6 +49,7 @@ export type CourseInsert = {
   instructor_id: string
   name: string
   code: string
+  join_code?: string
   term: CourseTerm
   year_level: YearLevel
   enrollment_open?: boolean

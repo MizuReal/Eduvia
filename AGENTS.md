@@ -140,6 +140,9 @@ These are stated once, here. Every other section assumes them.
   class view to last name and the student view to highest percentage first. Export the current
   order as CSV or through the browser print dialog (Save as PDF); never compute grades in the
   browser.
+- Student quiz summary: the subject page offers a read-only summary of the student's best graded
+  attempt for every published quiz. It is loaded on request, uses the same datatable and CSV/PDF
+  exports, and prints only the summary.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
 - Transient success confirmations use the shared toast: `role="status"`, polite announcement,
@@ -227,6 +230,8 @@ These are stated once, here. Every other section assumes them.
 - Self-registration requires a `TUPT-XX-XXXX` username with digits, first/middle/last name,
   faculty, and role. Student accounts are open; instructor accounts require the backend-only
   teacher registration code. Legacy usernames remain valid for sign-in.
+- Every subject has a globally unique six-character class join code. Students may enroll through
+  the invite link or by entering the code; both paths use the same approval/auto-accept rules.
 - Courses are `draft`, `published`, or `archived`. Only the owner or an admin may edit.
   Publishing requires at least one lesson with at least one block, and is transactional.
 - Course lifecycle status remains target behavior. Current enrollment availability is controlled

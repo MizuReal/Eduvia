@@ -2,8 +2,10 @@ import type { Request, Response } from 'express'
 import type { ZodError } from 'zod'
 import { AppError } from '../errors/AppError.js'
 import { topicIdParamSchema } from '../schemas/courseOutline.js'
+import { courseIdEnrollmentParamSchema } from '../schemas/enrollment.js'
 import { studentQuizResultsParamSchema } from '../schemas/quizResults.js'
 import {
+  getOwnStudentQuizResults as getOwnStudentQuizResultsService,
   getStudentQuizResults as getStudentQuizResultsService,
   getTopicQuizResults as getTopicQuizResultsService,
 } from '../services/quizResultsService.js'
@@ -49,6 +51,24 @@ export async function getStudentQuizResultsHandler(
     user,
     params.data.courseId,
     params.data.studentId,
+  )
+  res.status(200).json({ data: results, error: null })
+}
+
+export async function getOwnStudentQuizResultsHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const user = requireAuthenticatedUser(req)
+  const params = courseIdEnrollmentParamSchema.safeParse(req.params)
+
+  if (!params.success) {
+    throw validationError(params.error)
+  }
+
+  const results = await getOwnStudentQuizResultsService(
+    user,
+    params.data.courseId,
   )
   res.status(200).json({ data: results, error: null })
 }

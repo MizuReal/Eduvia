@@ -59,6 +59,7 @@ const course = {
   id: 'course-1',
   name: 'Web Systems',
   code: 'IT301',
+  joinCode: 'K7M2QX',
   term: 'first_trimester',
   yearLevel: 3,
   createdAt: '2026-11-02T00:00:00.000Z',

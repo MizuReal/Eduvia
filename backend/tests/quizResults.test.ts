@@ -13,6 +13,7 @@ const { mocks } = vi.hoisted(() => {
     listStudentsByIds: vi.fn(),
     listStudentNamesByIds: vi.fn(),
     findStudentEnrollment: vi.fn(),
+    findCourseEnrollmentPreview: vi.fn(),
     findQuizByTopic: vi.fn(),
     listPublishedQuizzesForCourse: vi.fn(),
     listGradedAttemptsForQuiz: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock('../src/db/enrollments.js', async (importOriginal) => {
   return {
     ...actual,
     findStudentEnrollment: mocks.findStudentEnrollment,
+    findCourseEnrollmentPreview: mocks.findCourseEnrollmentPreview,
     listEnrollmentsForCourse: mocks.listEnrollmentsForCourse,
     listStudentsByIds: mocks.listStudentsByIds,
   }
@@ -132,6 +134,7 @@ const course = {
   id: courseId,
   name: 'Web Systems',
   code: 'WEB101',
+  joinCode: 'K7M2QX',
   term: 'first_trimester' as const,
   yearLevel: 2 as const,
   enrollmentOpen: true,
@@ -250,6 +253,10 @@ describe('quiz results API', () => {
     Object.values(mocks).forEach((mock) => mock.mockReset())
     mocks.findProfileById.mockResolvedValue(instructorProfile)
     mocks.findCourseForInstructor.mockResolvedValue(course)
+    mocks.findCourseEnrollmentPreview.mockResolvedValue({
+      ...course,
+      instructorUsername: 'teacher_one',
+    })
     mocks.findTopicForInstructor.mockResolvedValue(topic)
     mocks.findQuizByTopic.mockResolvedValue(quiz)
     mocks.listEnrollmentsForCourse.mockResolvedValue([
@@ -505,5 +512,56 @@ describe('quiz results API', () => {
 
     expect(response.status).toBe(404)
     expect(response.body.error.code).toBe('STUDENT_NOT_FOUND')
+  })
+
+  it('returns the signed-in student’s own quiz summary', async () => {
+    mocks.findProfileById.mockResolvedValue(studentProfile)
+
+    const response = await request(app)
+      .get(`/api/student/subjects/${courseId}/quiz-results`)
+      .set('Authorization', `Bearer ${await signTestToken(studentProfile.id)}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.data.student.username).toBe('student_one')
+    expect(response.body.data.rows).toHaveLength(2)
+    expect(response.body.data.rows[0]).toMatchObject({
+      topicTitle: 'HTML foundations',
+      quizTitle: 'HTML quiz',
+      attempts: 1,
+      percentage: 80,
+      status: 'passed',
+    })
+    expect(response.body.data.rows[1]).toMatchObject({
+      topicTitle: 'CSS layout',
+      quizTitle: 'CSS quiz',
+      percentage: null,
+      status: 'not_taken',
+    })
+  })
+
+  it('requires an active enrollment for the student summary', async () => {
+    mocks.findProfileById.mockResolvedValue(studentProfile)
+    mocks.findStudentEnrollment.mockResolvedValue({
+      ...activeEnrollment,
+      status: 'pending',
+    })
+
+    const response = await request(app)
+      .get(`/api/student/subjects/${courseId}/quiz-results`)
+      .set('Authorization', `Bearer ${await signTestToken(studentProfile.id)}`)
+
+    expect(response.status).toBe(404)
+    expect(response.body.error.code).toBe('SUBJECT_NOT_FOUND')
+  })
+
+  it('rejects instructors on the student summary endpoint', async () => {
+    const response = await request(app)
+      .get(`/api/student/subjects/${courseId}/quiz-results`)
+      .set(
+        'Authorization',
+        `Bearer ${await signTestToken(instructorProfile.id)}`,
+      )
+
+    expect(response.status).toBe(403)
   })
 })

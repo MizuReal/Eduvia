@@ -21,3 +21,13 @@ export function getStudentQuizResults(
     accessToken,
   )
 }
+
+export function getOwnQuizResults(
+  courseId: string,
+  accessToken: string,
+): Promise<StudentQuizResults> {
+  return get<StudentQuizResults>(
+    `/api/student/subjects/${courseId}/quiz-results`,
+    accessToken,
+  )
+}

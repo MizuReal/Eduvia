@@ -29,6 +29,8 @@ export const COURSE_NAME_MAX_LENGTH = 120
 export const COURSE_CODE_MIN_LENGTH = 3
 export const COURSE_CODE_MAX_LENGTH = 20
 export const COURSE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,19}$/i
+export const CLASS_CODE_LENGTH = 6
+export const CLASS_CODE_PATTERN = /^[A-Za-z0-9]{6}$/
 
 export const TOPIC_TITLE_MIN_LENGTH = 2
 export const TOPIC_TITLE_MAX_LENGTH = 120

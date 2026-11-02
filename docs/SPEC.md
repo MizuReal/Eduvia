@@ -12,7 +12,7 @@ with an A–D answer key, publish validation, and teacher-preview grading), enro
 (invite links, approval or auto-accept, rosters, and read-only student subject pages), and the
 student learning path (slide progress, topic locking, summaries, quiz attempts, autosave,
 server grading, and pass-based unlocking), across migrations `001_profiles.sql` through
-`013_profiles_registration.sql`. Lesson content blocks and enrollment progress remain the target
+`014_class_join_code.sql`. Lesson content blocks and enrollment progress remain the target
 contract — build them to this spec, not to an approximation of it.
 
 ---
@@ -62,8 +62,10 @@ DELETE /api/files/:fileId
 
 GET    /api/enrollments/me                                   ✓ student-only
 GET    /api/enrollments/join/:courseId                        ✓ student-only
+POST   /api/enrollments/join-code                             ✓ student-only
 POST   /api/enrollments                                       ✓ student-only
 GET    /api/student/subjects/:courseId                        ✓ student-only
+GET    /api/student/subjects/:courseId/quiz-results           ✓ student-only
 GET    /api/student/topics/:topicId/content                   ✓ student-only
 PATCH  /api/student/topics/:topicId/progress                  ✓ student-only
 GET    /api/courses/:courseId/enrollments                     ✓ instructor-only
@@ -178,11 +180,18 @@ PATCH  /api/admin/users/:userId/role
   paper with `DELETE /api/quizzes/:quizId/paper` returns the quiz to draft.
 - `GET /api/enrollments/me` returns the student's `active` subjects and `pending` requests.
 - `GET /api/enrollments/join/:courseId` returns the subject preview, enrollment state, and
-  whether enrollment is open. `POST /api/enrollments` accepts `{ "courseId": uuid }` and is
+  whether enrollment is open. `POST /api/enrollments/join-code` accepts
+  `{ "code": "K7M2QX" }`, resolves the globally unique class code, and returns
+  `{ "courseId": uuid }`; the student then uses the normal preview flow. `POST /api/enrollments`
+  accepts `{ "courseId": uuid }` and is
   idempotent. It creates an `active` enrollment in `auto` mode and a `pending` request in
   `approval` mode. A closed subject returns `409 ENROLLMENT_CLOSED`.
 - `GET /api/student/subjects/:courseId` returns subject metadata plus the ordered topics and
   lesson titles. It returns 404 unless the student has an active enrollment.
+- `GET /api/student/subjects/:courseId/quiz-results` returns the signed-in student's own summary
+  for every published quiz in the subject: best graded attempt, score, percentage, pass/fail,
+  attempts, and last submission. Unattempted quizzes appear as `not_taken`. It requires an
+  active enrollment and never returns correct answers or scoring keys.
 - `GET /api/student/topics/:topicId/content` returns the topic's Tiptap slides and uploaded
   presentation previews with short-lived signed URLs, plus saved progress, summary, quiz
   summary, latest attempt, lock state, and next topic. It returns 404 unless the student has an
@@ -205,7 +214,7 @@ PATCH  /api/admin/users/:userId/role
   `{ "open": boolean, "mode": "approval" | "auto" }`.
 - `POST /api/enrollments/:enrollmentId/approve` and `/reject` act on pending requests.
   `DELETE /api/enrollments/:enrollmentId` removes an active or pending student. A removed
-  student may request again through the invite link.
+  student may request again through the invite link or class code.
 - In-progress attempt payloads omit correct answers, correct option ids, accepted answers,
   explanations, and scoring keys.
 
@@ -428,6 +437,10 @@ Every subject has one enrollment setting and at most one enrollment row per stud
 - **Invite link** — teachers share `/student/enroll/{courseId}`. Students open the link, see
   the subject preview, and request or join. Course codes are not used for discovery because
   they are unique only within an instructor/trimester/year-level scope.
+- **Class code** — every subject has a globally unique six-character `join_code` that avoids
+  ambiguous characters. Students enter it on `/student`; the API resolves it to a subject and
+  the student continues through the same preview and enrollment flow. It is separate from the
+  public subject code.
 - **Open enrollment** — `courses.enrollment_open` defaults to `false`. Closing a subject blocks
   new requests but keeps active students enrolled.
 - **Mode** — `courses.enrollment_mode` is `approval` (default) or `auto`. Approval creates a
@@ -451,6 +464,10 @@ Every subject has one enrollment setting and at most one enrollment row per stud
 - **Teacher quiz results** — `/teacher/subjects/{courseId}/topics/{topicId}/results` shows every
   active student's best graded attempt for that topic's quiz. Both result pages are sortable and
   export the current order as CSV or a print-to-PDF document.
+- **Student quiz summary** — `/student/subjects/{courseId}` offers a Quiz summary card. On
+  request it shows the student's best graded attempt for each published quiz in that subject,
+  with the same sortable table and CSV/print-to-PDF exports. The print output contains only the
+  summary, not the subject outline.
 
 ---
 
@@ -475,6 +492,8 @@ Every subject has one enrollment setting and at most one enrollment row per stud
   soft-deleted. Generated codes use this same scope; custom codes must satisfy it too.
 - `courses.enrollment_open` defaults to `false`; `courses.enrollment_mode` is `approval` or
   `auto`.
+- `courses.join_code` is a globally unique six-character class code using an unambiguous
+  alphabet. It is generated per course and is separate from the display subject `code`.
 - `enrollments` is unique on `(course_id, student_id)` and constrains `status` to `pending`,
   `active`, `rejected`, or `removed`.
 - `course_topics` is unique on `(id, course_id)`; `lessons` references that pair with a composite

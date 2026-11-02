@@ -4,6 +4,7 @@ export type Course = {
   id: string
   name: string
   code: string
+  joinCode: string
   term: CourseTerm
   yearLevel: YearLevel
   enrollmentOpen: boolean

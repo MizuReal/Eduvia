@@ -11,7 +11,7 @@ import {
   updateCourseEnrollmentSettings,
   updateEnrollmentStatus,
 } from '../db/enrollments.js'
-import { findCourseForInstructor } from '../db/courses.js'
+import { findCourseForInstructor, findCourseIdByJoinCode } from '../db/courses.js'
 import { getStudentSubjectWorkspace } from './studentLearningService.js'
 import { AppError } from '../errors/AppError.js'
 import type { UpdateEnrollmentSettingsInput } from '../schemas/enrollment.js'
@@ -121,6 +121,22 @@ export async function getEnrollmentJoinPreview(
     enrollmentMode: course.enrollmentMode,
     status: enrollment?.status ?? null,
   }
+}
+
+export async function resolveClassCode(
+  code: string,
+): Promise<{ courseId: string }> {
+  const courseId = await findCourseIdByJoinCode(code)
+
+  if (!courseId) {
+    throw new AppError(
+      404,
+      'CLASS_CODE_NOT_FOUND',
+      'No subject matches that class code.',
+    )
+  }
+
+  return { courseId }
 }
 
 export async function requestEnrollment(

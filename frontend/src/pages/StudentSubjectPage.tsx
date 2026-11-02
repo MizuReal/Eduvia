@@ -11,6 +11,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
 import { CourseProgressBar } from '../components/student/ProgressBars'
 import { StudentAccessGate } from '../components/student/StudentAccessGate'
+import { StudentQuizSummary } from '../components/results/StudentQuizSummary'
 import { TopicStatusBadge } from '../components/student/TopicStatusBadge'
 import { Button } from '../components/ui/Button'
 import { courseTermLabel, yearLevelLabel } from '../config/course'
@@ -59,10 +60,22 @@ function SubjectError({
   )
 }
 
-function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
+function SubjectContent({
+  subject,
+  accessToken,
+}: {
+  subject: StudentSubjectWorkspace
+  accessToken: string
+}) {
+  const [isQuizSummaryReady, setIsQuizSummaryReady] = useState(false)
+
   return (
     <>
-      <div className="mt-md max-w-3xl">
+      <div
+        className={`mt-md max-w-3xl ${
+          isQuizSummaryReady ? 'print:hidden' : ''
+        }`}
+      >
         <span className="inline-flex items-center rounded-full bg-surface px-xs py-xxs text-eyebrow text-primary shadow-soft">
           {subject.code}
         </span>
@@ -75,13 +88,25 @@ function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
         </p>
       </div>
 
-      <CourseProgressBar
-        completed={subject.progress.completedTopics}
-        total={subject.progress.totalTopics}
-        percent={subject.progress.percent}
+      <div className={isQuizSummaryReady ? 'print:hidden' : undefined}>
+        <CourseProgressBar
+          completed={subject.progress.completedTopics}
+          total={subject.progress.totalTopics}
+          percent={subject.progress.percent}
+        />
+      </div>
+
+      <StudentQuizSummary
+        courseId={subject.id}
+        accessToken={accessToken}
+        courseName={subject.name}
+        onReadyChange={setIsQuizSummaryReady}
       />
 
-      <section aria-labelledby="subject-topics-heading" className="mt-xl">
+      <section
+        aria-labelledby="subject-topics-heading"
+        className={`mt-xl ${isQuizSummaryReady ? 'print:hidden' : ''}`}
+      >
         <div className="flex items-center justify-between gap-md">
           <h2 id="subject-topics-heading" className="text-heading-3">
             Topics and lessons
@@ -207,11 +232,11 @@ export function StudentSubjectPage({ onOpenAuth }: StudentSubjectPageProps) {
   }, [load, reloadKey])
 
   return (
-    <section className="py-xl lg:py-section">
+    <section className="py-xl lg:py-section print:py-0">
       <Container>
         <Link
           to="/student"
-          className="inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary print:hidden"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           My subjects
@@ -245,8 +270,8 @@ export function StudentSubjectPage({ onOpenAuth }: StudentSubjectPageProps) {
               onRetry={() => setReloadKey((key) => key + 1)}
             />
           )}
-          {!isLoading && !notFound && !loadError && subject && (
-            <SubjectContent subject={subject} />
+          {!isLoading && !notFound && !loadError && subject && accessToken && (
+            <SubjectContent subject={subject} accessToken={accessToken} />
           )}
         </StudentAccessGate>
       </Container>

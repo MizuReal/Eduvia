@@ -6,6 +6,7 @@ import { StudentEnrollPage } from '../pages/StudentEnrollPage'
 import { StudentPage } from '../pages/StudentPage'
 import { StudentSubjectPage } from '../pages/StudentSubjectPage'
 import { StudentTopicPage } from '../pages/StudentTopicPage'
+import { ApiError } from '../services/apiClient'
 
 type MockProfile = {
   id: string
@@ -44,6 +45,7 @@ const enrollmentMocks = vi.hoisted(() => ({
   getEnrollmentJoinPreview: vi.fn(),
   requestEnrollment: vi.fn(),
   getStudentSubject: vi.fn(),
+  lookupClassCode: vi.fn(),
 }))
 
 vi.mock('../services/enrollmentService', () => enrollmentMocks)
@@ -63,6 +65,12 @@ const learningMocks = vi.hoisted(() => ({
 
 vi.mock('../services/learningService', () => learningMocks)
 
+const quizResultsMocks = vi.hoisted(() => ({
+  getOwnQuizResults: vi.fn(),
+}))
+
+vi.mock('../services/quizResultsService', () => quizResultsMocks)
+
 vi.mock('../components/content/TiptapRenderer', () => ({
   TiptapRenderer: ({ label }: { label: string }) => <p>{label}</p>,
 }))
@@ -74,6 +82,7 @@ const course = {
   id: courseId,
   name: 'Web Systems',
   code: 'WEB101',
+  joinCode: 'K7M2QX',
   term: 'first_trimester' as const,
   yearLevel: 2 as const,
   enrollmentOpen: true,
@@ -253,6 +262,7 @@ describe('student pages', () => {
     Object.values(enrollmentMocks).forEach((mock) => mock.mockReset())
     Object.values(studentContentMocks).forEach((mock) => mock.mockReset())
     Object.values(learningMocks).forEach((mock) => mock.mockReset())
+    quizResultsMocks.getOwnQuizResults.mockReset()
     studentAuth()
     learningMocks.recordSlideProgress.mockImplementation(
       async () => topicContent.progress,
@@ -274,6 +284,7 @@ describe('student pages', () => {
       enrollmentMode: 'approval',
       status: 'pending',
     })
+    enrollmentMocks.lookupClassCode.mockResolvedValue({ courseId })
     enrollmentMocks.getStudentSubject.mockResolvedValue(subject)
   })
 
@@ -297,6 +308,69 @@ describe('student pages', () => {
     expect(screen.getByText('Pending requests')).toBeInTheDocument()
     expect(
       screen.getByText(/waiting for @teacher_one/i),
+    ).toBeInTheDocument()
+  })
+
+  it('opens the subject preview from a class code', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/student']}>
+        <Routes>
+          <Route
+            path="/student"
+            element={<StudentPage onOpenAuth={vi.fn()} />}
+          />
+          <Route
+            path="/student/enroll/:courseId"
+            element={<StudentEnrollPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText('Class code'), 'k7m2qx')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(enrollmentMocks.lookupClassCode).toHaveBeenCalledWith(
+        'K7M2QX',
+        'test-token',
+      )
+    })
+    expect(
+      await screen.findByRole('heading', { name: 'Web Systems' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows an error for an unknown class code', async () => {
+    const user = userEvent.setup()
+    enrollmentMocks.lookupClassCode.mockRejectedValue(
+      new ApiError(
+        'CLASS_CODE_NOT_FOUND',
+        'No subject matches that class code.',
+        404,
+      ),
+    )
+
+    render(
+      <MemoryRouter initialEntries={['/student']}>
+        <Routes>
+          <Route
+            path="/student"
+            element={<StudentPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText('Class code'), 'ABC123')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(
+      await screen.findByText(
+        'No subject matches that class code. Check the code and try again.',
+      ),
     ).toBeInTheDocument()
   })
 
@@ -604,6 +678,82 @@ describe('student pages', () => {
     expect(
       screen.queryByRole('link', { name: 'Open HTML foundations' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('loads the student quiz summary on request', async () => {
+    const user = userEvent.setup()
+    quizResultsMocks.getOwnQuizResults.mockResolvedValue({
+      course,
+      student: {
+        id: 'student-1',
+        username: 'student_one',
+        faculty: 'BSIT',
+      },
+      rows: [
+        {
+          topicId: '33333333-3333-4333-8333-333333333333',
+          topicTitle: 'HTML foundations',
+          topicOrderIndex: 0,
+          quizId: '66666666-6666-4666-8666-666666666666',
+          quizTitle: 'HTML quiz',
+          quizMode: 'native' as const,
+          passingScore: 75,
+          attempts: 1,
+          bestScore: 8,
+          maxScore: 10,
+          percentage: 80,
+          status: 'passed' as const,
+          lastSubmittedAt: timestamp,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter initialEntries={[`/student/subjects/${courseId}`]}>
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId"
+            element={<StudentSubjectPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(
+      await screen.findByRole('button', { name: 'View summary' }),
+    )
+
+    expect(await screen.findByText('HTML quiz')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Export CSV' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Print / PDF' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows an error when the quiz summary cannot load', async () => {
+    const user = userEvent.setup()
+    quizResultsMocks.getOwnQuizResults.mockRejectedValue(
+      new ApiError('SUMMARY_LOAD_FAILED', 'Could not load summary.', 503),
+    )
+
+    render(
+      <MemoryRouter initialEntries={[`/student/subjects/${courseId}`]}>
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId"
+            element={<StudentSubjectPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(
+      await screen.findByRole('button', { name: 'View summary' }),
+    )
+
+    expect(await screen.findByText('Could not load summary.')).toBeInTheDocument()
   })
 
   it('shows an empty state when a topic has no slides', async () => {

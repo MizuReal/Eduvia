@@ -20,7 +20,7 @@ const ENROLLMENT_COLUMNS =
   'id, course_id, student_id, status, decided_by, decided_at, removed_by, removed_at, created_at, updated_at'
 
 const COURSE_WITH_INSTRUCTOR_COLUMNS =
-  'instructor_id, id, name, code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
+  'instructor_id, id, name, code, join_code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
 
 const INSTRUCTOR_USERNAME_TTL_MS = 60_000
 
@@ -37,6 +37,7 @@ type EnrollmentCourseRow = Pick<
   | 'id'
   | 'name'
   | 'code'
+  | 'join_code'
   | 'term'
   | 'year_level'
   | 'enrollment_open'
@@ -142,6 +143,7 @@ function toEnrollmentCourse(row: EnrollmentCourseRow): Course {
     id: row.id,
     name: row.name,
     code: row.code,
+    joinCode: row.join_code,
     term: row.term,
     yearLevel: row.year_level,
     enrollmentOpen: row.enrollment_open,

@@ -3,14 +3,17 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import type { SortingState } from '@tanstack/react-table'
 import { ArrowLeft, ClipboardCheck, Gauge, ListChecks, Trophy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
 import { ResultStatCard } from '../components/results/ResultStatCard'
-import { ResultStatusBadge } from '../components/results/ResultStatusBadge'
-import { RESULT_STATUS_LABELS } from '../components/results/resultStatusLabels'
+import {
+  STUDENT_QUIZ_COLUMNS,
+  STUDENT_QUIZ_CSV_COLUMNS,
+  STUDENT_QUIZ_DEFAULT_SORTING,
+} from '../components/results/studentQuizColumns'
 import {
   ResultsLoadError,
   ResultsNotFound,
@@ -25,101 +28,17 @@ import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
 import { getStudentQuizResults } from '../services/quizResultsService'
 import { toDateSlug, toFileSlug } from '../utils/tableExport'
-import type { CsvColumn } from '../utils/tableExport'
 import type { AuthMode } from '../types/auth'
 import type {
   StudentQuizResultRow,
   StudentQuizResults,
 } from '../types/quizResults'
 
-const DEFAULT_SORTING: SortingState = [{ id: 'percentage', desc: true }]
 const EMPTY_ROWS: StudentQuizResultRow[] = []
 
 type StudentResultsPageProps = {
   onOpenAuth: (mode: AuthMode) => void
 }
-
-function formatSubmittedAt(value: string | null): string {
-  if (!value) {
-    return '—'
-  }
-
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-}
-
-const STUDENT_QUIZ_COLUMNS: ColumnDef<StudentQuizResultRow>[] = [
-  {
-    id: 'topicTitle',
-    header: 'Topic',
-    accessorFn: (row) => row.topicTitle.toLowerCase(),
-    cell: ({ row }) => row.original.topicTitle,
-    sortingFn: (left, right) =>
-      left.original.topicTitle.localeCompare(
-        right.original.topicTitle,
-        undefined,
-        { sensitivity: 'base' },
-      ),
-  },
-  {
-    id: 'quizTitle',
-    header: 'Quiz',
-    accessorFn: (row) => row.quizTitle.toLowerCase(),
-    cell: ({ row }) => row.original.quizTitle,
-  },
-  {
-    id: 'attempts',
-    header: 'Attempts',
-    accessorFn: (row) => row.attempts,
-    cell: ({ row }) => row.original.attempts,
-  },
-  {
-    id: 'bestScore',
-    header: 'Best score',
-    enableSorting: false,
-    cell: ({ row }) =>
-      row.original.bestScore !== null && row.original.maxScore !== null
-        ? `${row.original.bestScore}/${row.original.maxScore}`
-        : '—',
-  },
-  {
-    id: 'percentage',
-    header: 'Score',
-    accessorFn: (row) => row.percentage ?? -1,
-    cell: ({ row }) =>
-      row.original.percentage !== null ? `${row.original.percentage}%` : '—',
-  },
-  {
-    id: 'status',
-    header: 'Result',
-    enableSorting: false,
-    cell: ({ row }) => <ResultStatusBadge status={row.original.status} />,
-  },
-  {
-    id: 'lastSubmittedAt',
-    header: 'Last submitted',
-    accessorFn: (row) => row.lastSubmittedAt ?? '',
-    cell: ({ row }) => formatSubmittedAt(row.original.lastSubmittedAt),
-  },
-]
-
-const STUDENT_QUIZ_CSV_COLUMNS: CsvColumn<StudentQuizResultRow>[] = [
-  { header: 'Topic', value: (row) => row.topicTitle },
-  { header: 'Quiz', value: (row) => row.quizTitle },
-  { header: 'Attempts', value: (row) => row.attempts },
-  {
-    header: 'Best score',
-    value: (row) =>
-      row.bestScore !== null && row.maxScore !== null
-        ? `${row.bestScore}/${row.maxScore}`
-        : '',
-  },
-  { header: 'Percentage', value: (row) => row.percentage },
-  { header: 'Result', value: (row) => RESULT_STATUS_LABELS[row.status] },
-  { header: 'Last submitted (UTC)', value: (row) => row.lastSubmittedAt },
-]
 
 export function StudentResultsPage({ onOpenAuth }: StudentResultsPageProps) {
   const { courseId, studentId } = useParams<{
@@ -133,7 +52,9 @@ export function StudentResultsPage({ onOpenAuth }: StudentResultsPageProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [sorting, setSorting] = useState<SortingState>(DEFAULT_SORTING)
+  const [sorting, setSorting] = useState<SortingState>(
+    STUDENT_QUIZ_DEFAULT_SORTING,
+  )
 
   useEffect(() => {
     if (!courseId || !studentId || !accessToken) {

@@ -7,6 +7,7 @@ import {
   startQuizAttemptHandler,
   submitStudentAttemptHandler,
 } from '../controllers/studentContentController.js'
+import { getOwnStudentQuizResultsHandler } from '../controllers/quizResultsController.js'
 import { requireAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/roles.js'
 
@@ -18,6 +19,11 @@ studentContentRouter.get(
   '/student/topics/:topicId/content',
   requireRole('student'),
   getStudentTopicContentHandler,
+)
+studentContentRouter.get(
+  '/student/subjects/:courseId/quiz-results',
+  requireRole('student'),
+  getOwnStudentQuizResultsHandler,
 )
 studentContentRouter.patch(
   '/student/topics/:topicId/progress',

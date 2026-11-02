@@ -8,8 +8,10 @@ import {
   getStudentSubjectHandler,
   rejectEnrollmentHandler,
   removeEnrollmentHandler,
+  resolveClassCodeHandler,
   updateEnrollmentSettingsHandler,
 } from '../controllers/enrollmentController.js'
+import { joinCodeRateLimiter } from '../middleware/rateLimit.js'
 import { requireAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/roles.js'
 
@@ -26,6 +28,12 @@ enrollmentRouter.get(
   '/enrollments/join/:courseId',
   requireRole('student'),
   getEnrollmentJoinPreviewHandler,
+)
+enrollmentRouter.post(
+  '/enrollments/join-code',
+  requireRole('student'),
+  joinCodeRateLimiter,
+  resolveClassCodeHandler,
 )
 enrollmentRouter.post(
   '/enrollments',

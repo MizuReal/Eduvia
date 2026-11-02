@@ -7,6 +7,7 @@ const { mocks } = vi.hoisted(() => {
   const mocks = {
     findProfileById: vi.fn(),
     findCourseForInstructor: vi.fn(),
+    findCourseIdByJoinCode: vi.fn(),
     listTopicsAndLessons: vi.fn(),
     requestEnrollmentRecord: vi.fn(),
     listEnrollmentsForStudent: vi.fn(),
@@ -38,8 +39,9 @@ vi.mock('../src/db/profiles.js', () => ({
 
 vi.mock('../src/db/courses.js', () => ({
   COURSE_COLUMNS:
-    'id, name, code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at',
+    'id, name, code, join_code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at',
   findCourseForInstructor: mocks.findCourseForInstructor,
+  findCourseIdByJoinCode: mocks.findCourseIdByJoinCode,
   insertCourse: vi.fn(),
   listCourseCodesForScope: vi.fn(),
   listCoursesByInstructor: vi.fn(),
@@ -135,6 +137,7 @@ const course = {
   id: courseId,
   name: 'Web Systems',
   code: 'WEB101',
+  joinCode: 'K7M2QX',
   term: 'first_trimester' as const,
   yearLevel: 2 as const,
   enrollmentOpen: true,
@@ -192,6 +195,7 @@ describe('enrollment API', () => {
     Object.values(mocks).forEach((mock) => mock.mockReset())
     mocks.findProfileById.mockResolvedValue(studentProfile)
     mocks.findCourseForInstructor.mockResolvedValue(course)
+    mocks.findCourseIdByJoinCode.mockResolvedValue(null)
     mocks.listTopicsAndLessons.mockResolvedValue(topics)
     mocks.listContentPresenceForCourse.mockResolvedValue([
       { topic_id: topics[0]?.id ?? '', kind: 'presentation' },
@@ -289,6 +293,50 @@ describe('enrollment API', () => {
       'student-1',
     )
     expect(response.body.data.status).toBe('pending')
+  })
+
+  it('resolves a class code to a subject', async () => {
+    mocks.findCourseIdByJoinCode.mockResolvedValue(courseId)
+
+    const response = await request(app)
+      .post('/api/enrollments/join-code')
+      .set('Authorization', `Bearer ${await signTestToken()}`)
+      .send({ code: 'k7m2qx' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.data).toEqual({ courseId })
+    expect(mocks.findCourseIdByJoinCode).toHaveBeenCalledWith('K7M2QX')
+  })
+
+  it('returns 404 for an unknown class code', async () => {
+    const response = await request(app)
+      .post('/api/enrollments/join-code')
+      .set('Authorization', `Bearer ${await signTestToken()}`)
+      .send({ code: 'ABC123' })
+
+    expect(response.status).toBe(404)
+    expect(response.body.error.code).toBe('CLASS_CODE_NOT_FOUND')
+  })
+
+  it('rejects a malformed class code', async () => {
+    const response = await request(app)
+      .post('/api/enrollments/join-code')
+      .set('Authorization', `Bearer ${await signTestToken()}`)
+      .send({ code: 'ABC' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('rejects instructors on the class-code lookup', async () => {
+    mocks.findProfileById.mockResolvedValue(instructorProfile)
+
+    const response = await request(app)
+      .post('/api/enrollments/join-code')
+      .set('Authorization', `Bearer ${await signTestToken()}`)
+      .send({ code: 'ABC123' })
+
+    expect(response.status).toBe(403)
   })
 
   it('returns the subject table of contents for active students', async () => {

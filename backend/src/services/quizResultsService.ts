@@ -9,6 +9,7 @@ import {
   listTopicsAndLessons,
 } from '../db/courseOutline.js'
 import {
+  findCourseEnrollmentPreview,
   findStudentEnrollment,
   listEnrollmentsForCourse,
   listStudentsByIds,
@@ -253,10 +254,33 @@ export async function getStudentQuizResults(
     throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.')
   }
 
+  return buildStudentQuizResults(course, studentId)
+}
+
+export async function getOwnStudentQuizResults(
+  user: AuthenticatedUser,
+  courseId: string,
+): Promise<StudentQuizResults> {
+  const [enrollment, course] = await Promise.all([
+    findStudentEnrollment(courseId, user.id),
+    findCourseEnrollmentPreview(courseId),
+  ])
+
+  if (!enrollment || enrollment.status !== 'active' || !course) {
+    throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.')
+  }
+
+  return buildStudentQuizResults(course, user.id)
+}
+
+async function buildStudentQuizResults(
+  course: StudentQuizResults['course'],
+  studentId: string,
+): Promise<StudentQuizResults> {
   const [topics, quizzes, attempts, students] = await Promise.all([
-    listTopicsAndLessons(courseId),
-    listPublishedQuizzesForCourse(courseId),
-    listGradedAttemptsForStudentCourse(courseId, studentId),
+    listTopicsAndLessons(course.id),
+    listPublishedQuizzesForCourse(course.id),
+    listGradedAttemptsForStudentCourse(course.id, studentId),
     listStudentsByIds([studentId]),
   ])
   const student = students.get(studentId)

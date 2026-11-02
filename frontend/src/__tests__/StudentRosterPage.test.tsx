@@ -42,6 +42,7 @@ const course = {
   id: courseId,
   name: 'Web Systems',
   code: 'WEB101',
+  joinCode: 'K7M2QX',
   term: 'first_trimester' as const,
   yearLevel: 2 as const,
   enrollmentOpen: true,
@@ -135,6 +136,26 @@ describe('StudentRosterPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('@student_two')).toBeInTheDocument()
     expect(screen.getByText('@student_one')).toBeInTheDocument()
+  })
+
+  it('shows and copies the class code', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+    renderRoster()
+
+    const settings = await screen.findByRole('region', {
+      name: 'Enrollment settings',
+    })
+    expect(within(settings).getByText('K7M2QX')).toBeInTheDocument()
+
+    await user.click(
+      within(settings).getByRole('button', { name: 'Copy code' }),
+    )
+
+    expect(writeText).toHaveBeenCalledWith('K7M2QX')
+    expect(
+      within(settings).getByRole('button', { name: 'Code copied' }),
+    ).toBeInTheDocument()
   })
 
   it('saves enrollment settings', async () => {
