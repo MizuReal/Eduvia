@@ -1,3 +1,11 @@
+import {
+  clearResponseCache,
+  readCached,
+  readInFlight,
+  trackInFlight,
+  writeCached,
+} from './responseCache'
+
 const configuredApiUrl = import.meta.env.VITE_API_URL
 export const API_BASE_URL =
   typeof configuredApiUrl === 'string'
@@ -131,6 +139,10 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     )
   } finally {
     clearTimeout(timeout)
+
+    if (init.method !== undefined && init.method !== 'GET') {
+      clearResponseCache()
+    }
   }
 }
 
@@ -193,10 +205,27 @@ export function deleteAuth<T>(path: string, accessToken: string): Promise<T> {
 }
 
 export function get<T>(path: string, accessToken: string): Promise<T> {
-  return request<T>(path, {
+  const cached = readCached<T>(path, accessToken)
+
+  if (cached.hit) {
+    return Promise.resolve(cached.value)
+  }
+
+  const pendingRequest = readInFlight<T>(path, accessToken)
+
+  if (pendingRequest) {
+    return pendingRequest
+  }
+
+  const responsePromise = request<T>(path, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
+  }).then((value) => {
+    writeCached(path, accessToken, value)
+    return value
   })
+
+  return trackInFlight(path, accessToken, responsePromise)
 }

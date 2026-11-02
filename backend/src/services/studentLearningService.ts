@@ -9,7 +9,7 @@ import type {
   QuizQuestionSelectRow,
   QuizSelectRow,
 } from '../db/quizzes.js'
-import { listTopicsAndLessons } from '../db/courseOutline.js'
+import { listTopicsAndLessons, findTopicById } from '../db/courseOutline.js'
 import type { CourseTopic } from '../types/courseOutline.js'
 import { findCourseEnrollmentPreview, findStudentEnrollment } from '../db/enrollments.js'
 import {
@@ -19,22 +19,31 @@ import {
   findLatestAttempt,
   gradeAttempt,
   listAttemptAnswers,
-  listAttemptsForStudentCourse,
+  listAttemptSummariesForStudentCourse,
   listTopicProgressForCourse,
   recordTopicSlideProgress,
   saveAttemptAnswers,
 } from '../db/learning.js'
 import type {
   AttemptAnswerRecord,
+  AttemptSummaryRecord,
   QuizAttemptRecord,
   TopicProgressRecord,
 } from '../db/learning.js'
-import { listContentForCourse } from '../db/topicContent.js'
+import {
+  listContentForTopic,
+  listContentPresenceForCourse,
+} from '../db/topicContent.js'
+import type { ContentPresenceRow } from '../db/topicContent.js'
 import { AppError } from '../errors/AppError.js'
 import { signFileForDelivery } from './fileService.js'
-import { getStudentTopicMaterials } from './topicContentService.js'
+import {
+  buildStudentTopicMaterials,
+  getTopicSlideCount,
+} from './topicContentService.js'
 import type { SaveAttemptAnswersInput } from '../schemas/learning.js'
 import type { AuthenticatedUser } from '../types/auth.js'
+import type { EnrollmentCourse } from '../types/enrollment.js'
 import type {
   AttemptAnswer,
   AttemptQuestion,
@@ -106,9 +115,9 @@ function toQuizSummary(
 }
 
 function latestAttemptsByQuiz(
-  attempts: QuizAttemptRecord[],
-): Map<string, QuizAttemptRecord> {
-  const byQuiz = new Map<string, QuizAttemptRecord>()
+  attempts: AttemptSummaryRecord[],
+): Map<string, AttemptSummaryRecord> {
+  const byQuiz = new Map<string, AttemptSummaryRecord>()
 
   for (const attempt of attempts) {
     if (!byQuiz.has(attempt.quizId)) {
@@ -127,7 +136,7 @@ function resolveTopicStatus(
   locked: boolean,
   progress: TopicProgress,
   quiz: StudentQuizSummary | null,
-  latestAttempt: QuizAttemptRecord | null,
+  latestAttempt: AttemptSummaryRecord | null,
 ): TopicLearningStatus {
   if (locked) {
     return 'locked'
@@ -154,7 +163,7 @@ function buildSubjectTopics(input: {
   progressByTopic: Map<string, TopicProgressRecord>
   quizzesByTopic: Map<string, QuizSelectRow>
   questionCounts: Map<string, number>
-  attemptsByQuiz: Map<string, QuizAttemptRecord>
+  attemptsByQuiz: Map<string, AttemptSummaryRecord>
 }): StudentSubjectTopic[] {
   const result: StudentSubjectTopic[] = []
   let previousStatus: TopicLearningStatus | null = null
@@ -195,62 +204,103 @@ function buildSubjectTopics(input: {
   return result
 }
 
+type AccessError = {
+  code: string
+  message: string
+}
+
+const SUBJECT_ACCESS_ERROR: AccessError = {
+  code: 'SUBJECT_NOT_FOUND',
+  message: 'Subject not found.',
+}
+
+const TOPIC_ACCESS_ERROR: AccessError = {
+  code: 'TOPIC_NOT_FOUND',
+  message: 'Topic not found.',
+}
+
+type StudentCourseContext = {
+  course: EnrollmentCourse
+  topics: CourseTopic[]
+  contentByTopic: Map<string, ContentPresenceRow[]>
+  progressByTopic: Map<string, TopicProgressRecord>
+  quizzesByTopic: Map<string, QuizSelectRow>
+  attemptsByQuiz: Map<string, AttemptSummaryRecord>
+}
+
+async function loadStudentCourseContext(
+  user: AuthenticatedUser,
+  courseId: string,
+  accessError: AccessError = SUBJECT_ACCESS_ERROR,
+): Promise<StudentCourseContext> {
+  const [enrollment, course, topics, content, progressRows, quizzes, attempts] =
+    await Promise.all([
+      findStudentEnrollment(courseId, user.id),
+      findCourseEnrollmentPreview(courseId),
+      listTopicsAndLessons(courseId),
+      listContentPresenceForCourse(courseId),
+      listTopicProgressForCourse(courseId, user.id),
+      listPublishedQuizzesForCourse(courseId),
+      listAttemptSummariesForStudentCourse(courseId, user.id),
+    ])
+
+  if (!enrollment || enrollment.status !== 'active' || !course) {
+    throw new AppError(404, accessError.code, accessError.message)
+  }
+
+  const contentByTopic = new Map<string, ContentPresenceRow[]>()
+
+  for (const row of content) {
+    const rows = contentByTopic.get(row.topic_id) ?? []
+    rows.push(row)
+    contentByTopic.set(row.topic_id, rows)
+  }
+
+  return {
+    course,
+    topics,
+    contentByTopic,
+    progressByTopic: new Map(progressRows.map((row) => [row.topicId, row])),
+    quizzesByTopic: new Map(quizzes.map((quiz) => [quiz.topic_id, quiz])),
+    attemptsByQuiz: latestAttemptsByQuiz(attempts),
+  }
+}
+
+function buildStudentSubjectTopics(
+  context: StudentCourseContext,
+  questionCounts: Map<string, number>,
+): StudentSubjectTopic[] {
+  return buildSubjectTopics({
+    topics: context.topics,
+    contentByTopic: context.contentByTopic,
+    progressByTopic: context.progressByTopic,
+    quizzesByTopic: context.quizzesByTopic,
+    questionCounts,
+    attemptsByQuiz: context.attemptsByQuiz,
+  })
+}
+
+function loadQuestionCounts(
+  context: StudentCourseContext,
+): Promise<Map<string, number>> {
+  return countQuizQuestionsByQuizIds(
+    [...context.quizzesByTopic.values()].map((quiz) => quiz.id),
+  )
+}
+
 export async function getStudentSubjectWorkspace(
   user: AuthenticatedUser,
   courseId: string,
 ): Promise<StudentSubjectWorkspace> {
-  const enrollment = await findStudentEnrollment(courseId, user.id)
-
-  if (!enrollment || enrollment.status !== 'active') {
-    throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.')
-  }
-
-  const course = await findCourseEnrollmentPreview(courseId)
-
-  if (!course) {
-    throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.')
-  }
-
-  const [topics, content, progressRows, quizzes, attempts] = await Promise.all(
-    [
-      listTopicsAndLessons(courseId),
-      listContentForCourse(courseId),
-      listTopicProgressForCourse(courseId, user.id),
-      listPublishedQuizzesForCourse(courseId),
-      listAttemptsForStudentCourse(courseId, user.id),
-    ],
-  )
-  const contentByTopic = new Map<string, Array<{ kind: string }>>()
-
-  for (const row of content) {
-    const rows = contentByTopic.get(row.topic_id) ?? []
-    rows.push({ kind: row.kind })
-    contentByTopic.set(row.topic_id, rows)
-  }
-
-  const progressByTopic = new Map(
-    progressRows.map((row) => [row.topicId, row]),
-  )
-  const quizzesByTopic = new Map(
-    quizzes.map((quiz) => [quiz.topic_id, quiz]),
-  )
-  const questionCounts = await countQuizQuestionsByQuizIds(
-    quizzes.map((quiz) => quiz.id),
-  )
-  const subjectTopics = buildSubjectTopics({
-    topics,
-    contentByTopic,
-    progressByTopic,
-    quizzesByTopic,
-    questionCounts,
-    attemptsByQuiz: latestAttemptsByQuiz(attempts),
-  })
+  const context = await loadStudentCourseContext(user, courseId)
+  const questionCounts = await loadQuestionCounts(context)
+  const subjectTopics = buildStudentSubjectTopics(context, questionCounts)
   const completedTopics = subjectTopics.filter((topic) =>
     isTopicComplete(topic.status),
   ).length
 
   return {
-    ...course,
+    ...context.course,
     topics: subjectTopics,
     progress: {
       completedTopics,
@@ -267,18 +317,29 @@ export async function getStudentTopicContent(
   user: AuthenticatedUser,
   topicId: string,
 ): Promise<StudentTopicContent> {
-  const materials = await getStudentTopicMaterials(user, topicId)
-  const workspace = await getStudentSubjectWorkspace(
-    user,
-    materials.topic.courseId,
-  )
-  const topic = workspace.topics.find((item) => item.id === topicId)
+  const topic = await findTopicById(topicId)
 
   if (!topic) {
     throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
   }
 
-  if (topic.locked) {
+  const [context, contentRows] = await Promise.all([
+    loadStudentCourseContext(user, topic.course_id, TOPIC_ACCESS_ERROR),
+    listContentForTopic(topicId),
+  ])
+  const [subjectTopics, materials] = await Promise.all([
+    loadQuestionCounts(context).then((questionCounts) =>
+      buildStudentSubjectTopics(context, questionCounts),
+    ),
+    buildStudentTopicMaterials(topic, contentRows),
+  ])
+  const subjectTopic = subjectTopics.find((item) => item.id === topicId)
+
+  if (!subjectTopic) {
+    throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
+  }
+
+  if (subjectTopic.locked) {
     throw new AppError(
       403,
       'TOPIC_LOCKED',
@@ -286,17 +347,17 @@ export async function getStudentTopicContent(
     )
   }
 
-  const index = workspace.topics.findIndex((item) => item.id === topicId)
-  const nextTopicId = workspace.topics[index + 1]?.id ?? null
-  const latestAttempt = topic.quiz
-    ? await findLatestAttempt(topic.quiz.id, user.id)
+  const index = subjectTopics.findIndex((item) => item.id === topicId)
+  const nextTopicId = subjectTopics[index + 1]?.id ?? null
+  const latestAttempt = subjectTopic.quiz
+    ? (context.attemptsByQuiz.get(subjectTopic.quiz.id) ?? null)
     : null
 
   return {
     ...materials,
-    progress: topic.progress,
-    quiz: topic.quiz,
-    status: topic.status,
+    progress: subjectTopic.progress,
+    quiz: subjectTopic.quiz,
+    status: subjectTopic.status,
     latestAttempt: latestAttempt
       ? {
           percentage: latestAttempt.percentage ?? 0,
@@ -315,31 +376,31 @@ export async function recordSlideProgress(
   source: SlideSource,
   slideIndex: number,
 ): Promise<TopicProgress> {
-  const materials = await getStudentTopicMaterials(user, topicId)
-  const workspace = await getStudentSubjectWorkspace(
-    user,
-    materials.topic.courseId,
-  )
-  const topic = workspace.topics.find((item) => item.id === topicId)
+  const topic = await findTopicById(topicId)
 
   if (!topic) {
     throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
   }
 
-  if (topic.locked) {
+  const [context, slideCount] = await Promise.all([
+    loadStudentCourseContext(user, topic.course_id, TOPIC_ACCESS_ERROR),
+    getTopicSlideCount(topicId, source),
+  ])
+  const subjectTopic = buildStudentSubjectTopics(context, new Map()).find(
+    (item) => item.id === topicId,
+  )
+
+  if (!subjectTopic) {
+    throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
+  }
+
+  if (subjectTopic.locked) {
     throw new AppError(
       403,
       'TOPIC_LOCKED',
       'Finish the previous topic to unlock this one.',
     )
   }
-
-  const slideCount =
-    source === 'slides'
-      ? (materials.slides?.content.slides.length ?? 0)
-      : materials.upload
-        ? Math.max(1, materials.upload.previews.length)
-        : 0
 
   if (slideCount === 0) {
     throw new AppError(
@@ -349,9 +410,19 @@ export async function recordSlideProgress(
     )
   }
 
+  const storedProgress = context.progressByTopic.get(topicId) ?? null
+  const highestStoredIndex =
+    source === 'upload'
+      ? (storedProgress?.presentationHighestSlideIndex ?? -1)
+      : (storedProgress?.slidesHighestSlideIndex ?? -1)
+
+  if (slideIndex <= highestStoredIndex) {
+    return toTopicProgress(storedProgress, true)
+  }
+
   const safeIndex = Math.min(Math.max(0, slideIndex), slideCount - 1)
   const progress = await recordTopicSlideProgress({
-    courseId: materials.topic.courseId,
+    courseId: topic.course_id,
     topicId,
     studentId: user.id,
     source: source === 'upload' ? 'presentation' : 'slides',
@@ -366,10 +437,10 @@ async function buildAttemptWorkspace(
   attempt: QuizAttemptRecord,
 ): Promise<StudentAttemptWorkspace> {
   const snapshot = attempt.snapshot
-  const answerRows = await listAttemptAnswers(attempt.id)
-  const paperRow = snapshot.fileId
-    ? await findFileForQuiz(snapshot.fileId)
-    : null
+  const [answerRows, paperRow] = await Promise.all([
+    listAttemptAnswers(attempt.id),
+    snapshot.fileId ? findFileForQuiz(snapshot.fileId) : null,
+  ])
   const paper =
     paperRow && paperRow.status === 'ready'
       ? await toStudentQuizFile(paperRow)
@@ -513,8 +584,10 @@ async function requirePublishedQuiz(
     throw new AppError(404, 'QUIZ_NOT_FOUND', 'Quiz not found.')
   }
 
-  const workspace = await getStudentSubjectWorkspace(user, quiz.course_id)
-  const topic = workspace.topics.find((item) => item.id === quiz.topic_id)
+  const context = await loadStudentCourseContext(user, quiz.course_id)
+  const topic = buildStudentSubjectTopics(context, new Map()).find(
+    (item) => item.id === quiz.topic_id,
+  )
 
   if (!topic) {
     throw new AppError(404, 'QUIZ_NOT_FOUND', 'Quiz not found.')
@@ -536,8 +609,6 @@ async function requirePublishedQuiz(
     )
   }
 
-  const questions = await listQuizQuestions(quiz.id)
-
   if (quiz.mode === 'document' && !quiz.file_id) {
     throw new AppError(
       409,
@@ -546,16 +617,17 @@ async function requirePublishedQuiz(
     )
   }
 
-  if (quiz.mode === 'document') {
-    const paper = await findFileForQuiz(quiz.file_id)
+  const [questions, paper] = await Promise.all([
+    listQuizQuestions(quiz.id),
+    quiz.mode === 'document' ? findFileForQuiz(quiz.file_id) : null,
+  ])
 
-    if (!paper || paper.status !== 'ready') {
-      throw new AppError(
-        409,
-        'QUIZ_NOT_READY',
-        'This quiz paper is not available yet.',
-      )
-    }
+  if (quiz.mode === 'document' && (!paper || paper.status !== 'ready')) {
+    throw new AppError(
+      409,
+      'QUIZ_NOT_READY',
+      'This quiz paper is not available yet.',
+    )
   }
 
   return { quiz, questions, topic }
@@ -566,7 +638,10 @@ export async function startQuizAttempt(
   quizId: string,
 ): Promise<StudentAttemptWorkspace> {
   const { quiz, questions } = await requirePublishedQuiz(user, quizId)
-  const latest = await findLatestAttempt(quizId, user.id)
+  const [latest, inProgress] = await Promise.all([
+    findLatestAttempt(quizId, user.id),
+    findInProgressAttempt(quizId, user.id),
+  ])
 
   if (latest?.status === 'graded' && latest.passed) {
     throw new AppError(
@@ -575,8 +650,6 @@ export async function startQuizAttempt(
       'You already passed this quiz.',
     )
   }
-
-  const inProgress = await findInProgressAttempt(quizId, user.id)
 
   if (inProgress) {
     return buildAttemptWorkspace(inProgress)

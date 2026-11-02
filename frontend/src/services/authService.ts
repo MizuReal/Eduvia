@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js'
 import { AUTH_EMAIL_DOMAIN } from '../config/auth'
 import type { AuthProfile, Faculty } from '../types/auth'
 import { get, post } from './apiClient'
+import { clearResponseCache } from './responseCache'
 import { AuthError } from './authErrors'
 import { supabase } from './supabaseClient'
 
@@ -80,6 +81,8 @@ export async function register(input: RegisterInput): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  clearResponseCache()
+
   const { error } = await supabase.auth.signOut()
 
   if (error) {

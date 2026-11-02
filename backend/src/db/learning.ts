@@ -16,6 +16,8 @@ const PROGRESS_COLUMNS =
 
 const ATTEMPT_COLUMNS =
   'id, quiz_id, course_id, topic_id, student_id, attempt_number, status, snapshot, score, max_score, percentage, passed, started_at, submitted_at, graded_at, created_at, updated_at'
+const ATTEMPT_SUMMARY_COLUMNS =
+  'quiz_id, attempt_number, status, passed, percentage, graded_at'
 
 const ANSWER_COLUMNS =
   'id, attempt_id, question_id, selected_option, is_correct, points_awarded, created_at, updated_at'
@@ -97,6 +99,14 @@ export type QuizAttemptRecord = {
   gradedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type AttemptSummaryRecord = {
+  quizId: string
+  status: 'in_progress' | 'graded'
+  passed: boolean | null
+  percentage: number | null
+  gradedAt: string | null
 }
 
 export type AttemptAnswerRecord = AttemptAnswer & {
@@ -232,19 +242,22 @@ export async function recordTopicSlideProgress(input: {
   return toProgress(data)
 }
 
-export async function listAttemptsForStudentCourse(
+export async function listAttemptSummariesForStudentCourse(
   courseId: string,
   studentId: string,
-): Promise<QuizAttemptRecord[]> {
+): Promise<AttemptSummaryRecord[]> {
   const { data, error } = await supabaseAdmin
     .from('quiz_attempts')
-    .select(ATTEMPT_COLUMNS)
+    .select(ATTEMPT_SUMMARY_COLUMNS)
     .eq('course_id', courseId)
     .eq('student_id', studentId)
     .order('attempt_number', { ascending: false })
 
   if (error) {
-    logger.error({ err: error, courseId, studentId }, 'Attempt list failed')
+    logger.error(
+      { err: error, courseId, studentId },
+      'Attempt summary list failed',
+    )
     throw new AppError(
       503,
       'ATTEMPT_LOAD_FAILED',
@@ -252,7 +265,13 @@ export async function listAttemptsForStudentCourse(
     )
   }
 
-  return (data ?? []).map(toAttempt)
+  return (data ?? []).map((row) => ({
+    quizId: row.quiz_id,
+    status: row.status,
+    passed: row.passed,
+    percentage: row.percentage,
+    gradedAt: row.graded_at ? new Date(row.graded_at).toISOString() : null,
+  }))
 }
 
 export async function findLatestAttempt(

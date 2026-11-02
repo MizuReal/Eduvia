@@ -12,17 +12,15 @@ import {
   insertFile,
   listFilesForContent,
 } from '../db/files.js'
-import {
-  findCourseEnrollmentPreview,
-  findStudentEnrollment,
-} from '../db/enrollments.js'
-import { findTopicById, findTopicForInstructor } from '../db/courseOutline.js'
+import { findTopicForInstructor } from '../db/courseOutline.js'
+import type { TopicLookupRow } from '../db/courseOutline.js'
 import {
   findContentById,
   findContentByTopicAndKind,
   findContentForInstructor,
   insertContent,
   listContentForTopic,
+  listTopicSlideSources,
   softDeleteContentRecord,
   toTopicFile,
   updateContentRecord,
@@ -51,6 +49,7 @@ import {
   uploadCourseFile,
 } from '../storage/courseFiles.js'
 import type { AuthenticatedUser } from '../types/auth.js'
+import type { SlideSource } from '../types/learning.js'
 import type {
   DocContentItem,
   PresentationContentItem,
@@ -301,6 +300,14 @@ async function loadPresentationFile(
   return files[0] ?? null
 }
 
+async function buildPresentationContentItem(
+  row: TopicContentSelectRow,
+): Promise<PresentationContentItem> {
+  const fileRow = await loadPresentationFile(row.file_id)
+
+  return (await buildContentItem(row, fileRow)) as PresentationContentItem
+}
+
 function validateReferences(
   row: TopicContentSelectRow,
   content: unknown,
@@ -450,25 +457,17 @@ export async function getTopicWorkspace(
   const docRow = rows.find((row) => row.kind === 'doc')
   const uploadRow = rows.find((row) => row.kind === 'presentation')
 
-  let slides: SlidesContentItem | null = null
-  let doc: DocContentItem | null = null
-  let upload: PresentationContentItem | null = null
-
-  if (slidesRow) {
-    slides = (await buildContentItem(slidesRow, null)) as SlidesContentItem
-  }
-
-  if (docRow) {
-    doc = (await buildContentItem(docRow, null)) as DocContentItem
-  }
-
-  if (uploadRow) {
-    const fileRow = await loadPresentationFile(uploadRow.file_id)
-    upload = (await buildContentItem(
-      uploadRow,
-      fileRow,
-    )) as PresentationContentItem
-  }
+  const [slides, doc, upload] = await Promise.all([
+    slidesRow
+      ? buildContentItem(slidesRow, null).then(
+          (item) => item as SlidesContentItem,
+        )
+      : null,
+    docRow
+      ? buildContentItem(docRow, null).then((item) => item as DocContentItem)
+      : null,
+    uploadRow ? buildPresentationContentItem(uploadRow) : null,
+  ])
 
   return {
     topic: {
@@ -479,6 +478,29 @@ export async function getTopicWorkspace(
     slides,
     doc,
     upload,
+  }
+}
+
+async function loadPresentationPreviews(
+  courseId: string,
+  fileId: string,
+): Promise<{ paths: string[]; urls: Map<string, string> }> {
+  try {
+    const paths = await listCourseFilePaths(
+      presentationPreviewPrefix(courseId, fileId),
+    )
+
+    return {
+      paths,
+      urls: await createSignedUrlsForCourseFiles(paths),
+    }
+  } catch (error) {
+    logger.warn(
+      { err: error, fileId },
+      'Presentation preview URLs failed',
+    )
+
+    return { paths: [], urls: new Map() }
   }
 }
 
@@ -495,21 +517,11 @@ async function buildStudentPresentation(
     row,
     fileRow,
   )) as PresentationContentItem
-  const delivery = await signFileForDelivery(fileRow)
-  let previewPaths: string[] = []
-  let previewUrls = new Map<string, string>()
-
-  try {
-    previewPaths = await listCourseFilePaths(
-      presentationPreviewPrefix(row.course_id, fileRow.id),
-    )
-    previewUrls = await createSignedUrlsForCourseFiles(previewPaths)
-  } catch (error) {
-    logger.warn(
-      { err: error, fileId: fileRow.id },
-      'Presentation preview URLs failed',
-    )
-  }
+  const [delivery, previewResult] = await Promise.all([
+    signFileForDelivery(fileRow),
+    loadPresentationPreviews(row.course_id, fileRow.id),
+  ])
+  const { paths: previewPaths, urls: previewUrls } = previewResult
 
   const previewExpiresAt = new Date(
     Date.now() + env.SIGNED_URL_TTL_SECONDS * 1000,
@@ -538,37 +550,52 @@ async function buildStudentPresentation(
   }
 }
 
-export async function getStudentTopicMaterials(
-  user: AuthenticatedUser,
+export async function getTopicSlideCount(
   topicId: string,
+  source: SlideSource,
+): Promise<number> {
+  const sources = await listTopicSlideSources(topicId)
+
+  if (source === 'slides') {
+    return sources.find((row) => row.kind === 'slides')?.slide_count ?? 0
+  }
+
+  const presentation = sources.find((row) => row.kind === 'presentation')
+
+  if (!presentation || !presentation.file_id) {
+    return 0
+  }
+
+  const fileId = presentation.file_id
+  const paths = await listCourseFilePaths(
+    presentationPreviewPrefix(presentation.course_id, fileId),
+  ).catch((error: unknown) => {
+    logger.warn(
+      { err: error, fileId },
+      'Presentation preview count failed',
+    )
+
+    return [] as string[]
+  })
+
+  return Math.max(1, paths.length)
+}
+
+export async function buildStudentTopicMaterials(
+  topic: TopicLookupRow,
+  rows: TopicContentSelectRow[],
 ): Promise<StudentTopicMaterials> {
-  const topic = await findTopicById(topicId)
-
-  if (!topic) {
-    throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
-  }
-
-  const course = await findCourseEnrollmentPreview(topic.course_id)
-  const enrollment = await findStudentEnrollment(topic.course_id, user.id)
-
-  if (!course || !enrollment || enrollment.status !== 'active') {
-    throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.')
-  }
-
-  const rows = await listContentForTopic(topicId)
   const slidesRow = rows.find((row) => row.kind === 'slides')
   const uploadRow = rows.find((row) => row.kind === 'presentation')
 
-  let slides: SlidesContentItem | null = null
-  let upload: StudentPresentationContentItem | null = null
-
-  if (slidesRow) {
-    slides = (await buildContentItem(slidesRow, null)) as SlidesContentItem
-  }
-
-  if (uploadRow) {
-    upload = await buildStudentPresentation(uploadRow)
-  }
+  const [slides, upload] = await Promise.all([
+    slidesRow
+      ? buildContentItem(slidesRow, null).then(
+          (item) => item as SlidesContentItem,
+        )
+      : null,
+    uploadRow ? buildStudentPresentation(uploadRow) : null,
+  ])
 
   return {
     topic: {

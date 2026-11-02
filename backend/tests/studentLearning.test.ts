@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../src/errors/AppError.js'
 import {
   getStudentSubjectWorkspace,
+  getStudentTopicContent,
+  recordSlideProgress,
   startQuizAttempt,
   submitStudentAttempt,
 } from '../src/services/studentLearningService.js'
@@ -11,9 +13,12 @@ const { mocks } = vi.hoisted(() => {
     findStudentEnrollment: vi.fn(),
     findCourseEnrollmentPreview: vi.fn(),
     listTopicsAndLessons: vi.fn(),
-    listContentForCourse: vi.fn(),
+    findTopicById: vi.fn(),
+    listContentForTopic: vi.fn(),
+    listTopicSlideSources: vi.fn(),
+    listContentPresenceForCourse: vi.fn(),
     listTopicProgressForCourse: vi.fn(),
-    listAttemptsForStudentCourse: vi.fn(),
+    listAttemptSummariesForStudentCourse: vi.fn(),
     findLatestAttempt: vi.fn(),
     findInProgressAttempt: vi.fn(),
     findAttemptById: vi.fn(),
@@ -22,7 +27,8 @@ const { mocks } = vi.hoisted(() => {
     saveAttemptAnswers: vi.fn(),
     gradeAttempt: vi.fn(),
     recordTopicSlideProgress: vi.fn(),
-    getStudentTopicMaterials: vi.fn(),
+    buildStudentTopicMaterials: vi.fn(),
+    getTopicSlideCount: vi.fn(),
     signFileForDelivery: vi.fn(),
     getQuizById: vi.fn(),
     listPublishedQuizzesForCourse: vi.fn(),
@@ -41,17 +47,20 @@ vi.mock('../src/db/enrollments.js', () => ({
 
 vi.mock('../src/db/courseOutline.js', () => ({
   listTopicsAndLessons: mocks.listTopicsAndLessons,
+  findTopicById: mocks.findTopicById,
 }))
 
 vi.mock('../src/db/topicContent.js', () => ({
-  listContentForCourse: mocks.listContentForCourse,
+  listContentPresenceForCourse: mocks.listContentPresenceForCourse,
+  listContentForTopic: mocks.listContentForTopic,
+  listTopicSlideSources: mocks.listTopicSlideSources,
 }))
 
 vi.mock('../src/db/learning.js', () => ({
   findTopicProgress: vi.fn(),
   listTopicProgressForCourse: mocks.listTopicProgressForCourse,
   recordTopicSlideProgress: mocks.recordTopicSlideProgress,
-  listAttemptsForStudentCourse: mocks.listAttemptsForStudentCourse,
+  listAttemptSummariesForStudentCourse: mocks.listAttemptSummariesForStudentCourse,
   findLatestAttempt: mocks.findLatestAttempt,
   findInProgressAttempt: mocks.findInProgressAttempt,
   findAttemptById: mocks.findAttemptById,
@@ -70,7 +79,8 @@ vi.mock('../src/db/quizzes.js', () => ({
 }))
 
 vi.mock('../src/services/topicContentService.js', () => ({
-  getStudentTopicMaterials: mocks.getStudentTopicMaterials,
+  buildStudentTopicMaterials: mocks.buildStudentTopicMaterials,
+  getTopicSlideCount: mocks.getTopicSlideCount,
 }))
 
 vi.mock('../src/services/fileService.js', () => ({
@@ -256,12 +266,13 @@ describe('student learning service', () => {
     mocks.findStudentEnrollment.mockResolvedValue(activeEnrollment)
     mocks.findCourseEnrollmentPreview.mockResolvedValue(course)
     mocks.listTopicsAndLessons.mockResolvedValue(topics)
-    mocks.listContentForCourse.mockResolvedValue([
+    mocks.listContentPresenceForCourse.mockResolvedValue([
       { topic_id: topicOneId, kind: 'presentation' },
       { topic_id: topicTwoId, kind: 'slides' },
     ])
+    mocks.listContentForTopic.mockResolvedValue([])
     mocks.listTopicProgressForCourse.mockResolvedValue([])
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([])
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([])
     mocks.listPublishedQuizzesForCourse.mockResolvedValue([quiz])
     mocks.countQuizQuestionsByQuizIds.mockResolvedValue(
       new Map([[quizId, 2]]),
@@ -286,9 +297,85 @@ describe('student learning service', () => {
     expect(workspace.topics[1]?.locked).toBe(true)
   })
 
+  it('loads topic content from one course snapshot', async () => {
+    mocks.findTopicById.mockResolvedValue({
+      id: topicOneId,
+      course_id: courseId,
+      title: 'HTML foundations',
+      order_index: 0,
+      created_at: timestamp,
+      updated_at: timestamp,
+    })
+    mocks.listTopicProgressForCourse.mockResolvedValue([completedProgress])
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([
+      attemptRow('graded', true, 2, 2, 100),
+    ])
+    mocks.buildStudentTopicMaterials.mockResolvedValue({
+      topic: { id: topicOneId, title: 'HTML foundations', courseId },
+      slides: null,
+      upload: null,
+      summary: '',
+    })
+
+    const content = await getStudentTopicContent(student, topicOneId)
+
+    expect(mocks.findLatestAttempt).not.toHaveBeenCalled()
+    expect(content.status).toBe('passed')
+    expect(content.latestAttempt).toEqual({
+      percentage: 100,
+      passed: true,
+      gradedAt: timestamp,
+    })
+  })
+
+  it('skips writing slide progress that has not advanced', async () => {
+    mocks.findTopicById.mockResolvedValue({
+      id: topicOneId,
+      course_id: courseId,
+      title: 'HTML foundations',
+      order_index: 0,
+      created_at: timestamp,
+      updated_at: timestamp,
+    })
+    mocks.getTopicSlideCount.mockResolvedValue(2)
+    mocks.listTopicProgressForCourse.mockResolvedValue([completedProgress])
+
+    const progress = await recordSlideProgress(student, topicOneId, 'upload', 0)
+
+    expect(mocks.recordTopicSlideProgress).not.toHaveBeenCalled()
+    expect(progress.completed).toBe(true)
+  })
+
+  it('writes slide progress when the student advances', async () => {
+    mocks.findTopicById.mockResolvedValue({
+      id: topicOneId,
+      course_id: courseId,
+      title: 'HTML foundations',
+      order_index: 0,
+      created_at: timestamp,
+      updated_at: timestamp,
+    })
+    mocks.getTopicSlideCount.mockResolvedValue(2)
+    mocks.recordTopicSlideProgress.mockResolvedValue({
+      ...completedProgress,
+      presentationHighestSlideIndex: 1,
+    })
+
+    await recordSlideProgress(student, topicOneId, 'upload', 1)
+
+    expect(mocks.recordTopicSlideProgress).toHaveBeenCalledWith({
+      courseId,
+      topicId: topicOneId,
+      studentId: 'student-1',
+      source: 'presentation',
+      slideIndex: 1,
+      slideCount: 2,
+    })
+  })
+
   it('unlocks the next topic after the previous quiz is passed', async () => {
     mocks.listTopicProgressForCourse.mockResolvedValue([completedProgress])
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([
       attemptRow('graded', true, 2, 2, 100),
     ])
 
@@ -335,7 +422,7 @@ describe('student learning service', () => {
 
   it('rejects a new attempt after the quiz is passed', async () => {
     mocks.listTopicProgressForCourse.mockResolvedValue([completedProgress])
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([
       attemptRow('graded', true, 2, 2, 100),
     ])
     mocks.findLatestAttempt.mockResolvedValue(
@@ -350,7 +437,7 @@ describe('student learning service', () => {
 
   it('allows a new attempt after a failed quiz', async () => {
     mocks.listTopicProgressForCourse.mockResolvedValue([completedProgress])
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([
       attemptRow('graded', false, 0, 2, 0),
     ])
     mocks.findLatestAttempt.mockResolvedValue(

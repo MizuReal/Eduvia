@@ -6,6 +6,20 @@ import { supabaseAdmin } from './supabaseAdmin.js'
 
 const CONTENT_COLUMNS =
   'id, course_id, topic_id, kind, title, content, file_id, summary, order_index, slide_count, deleted_at, created_at, updated_at'
+const CONTENT_PRESENCE_COLUMNS = 'topic_id, kind'
+const TOPIC_SLIDE_SOURCE_COLUMNS = 'course_id, kind, slide_count, file_id'
+
+export type ContentPresenceRow = {
+  topic_id: string
+  kind: TopicContentRow['kind']
+}
+
+export type TopicSlideSourceRow = {
+  course_id: string
+  kind: TopicContentRow['kind']
+  slide_count: number | null
+  file_id: string | null
+}
 
 export type TopicContentSelectRow = Pick<
   TopicContentRow,
@@ -62,23 +76,46 @@ export async function listContentForTopic(
   return data ?? []
 }
 
-export async function listContentForCourse(
+export async function listContentPresenceForCourse(
   courseId: string,
-): Promise<TopicContentSelectRow[]> {
+): Promise<ContentPresenceRow[]> {
   const { data, error } = await supabaseAdmin
     .from('topic_content_items')
-    .select(CONTENT_COLUMNS)
+    .select(CONTENT_PRESENCE_COLUMNS)
     .eq('course_id', courseId)
     .is('deleted_at', null)
-    .order('topic_id', { ascending: true })
-    .order('kind', { ascending: true })
 
   if (error) {
-    logger.error({ err: error, courseId }, 'Course content list failed')
+    logger.error(
+      { err: error, courseId },
+      'Course content presence load failed',
+    )
     throw new AppError(
       503,
       'CONTENT_LOAD_FAILED',
       'We could not load this subject content. Try again.',
+    )
+  }
+
+  return data ?? []
+}
+
+export async function listTopicSlideSources(
+  topicId: string,
+): Promise<TopicSlideSourceRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('topic_content_items')
+    .select(TOPIC_SLIDE_SOURCE_COLUMNS)
+    .eq('topic_id', topicId)
+    .in('kind', ['slides', 'presentation'])
+    .is('deleted_at', null)
+
+  if (error) {
+    logger.error({ err: error, topicId }, 'Topic slide source load failed')
+    throw new AppError(
+      503,
+      'CONTENT_LOAD_FAILED',
+      'We could not load this topic content. Try again.',
     )
   }
 

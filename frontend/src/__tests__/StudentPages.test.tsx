@@ -388,6 +388,55 @@ describe('student pages', () => {
     expect(screen.getByText('Slide 1 content')).toBeInTheDocument()
   })
 
+  it('does not write slide progress when the page first loads', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'HTML foundations' }),
+    ).toBeInTheDocument()
+    expect(learningMocks.recordSlideProgress).not.toHaveBeenCalled()
+  })
+
+  it('writes progress when the student moves to a new slide', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'HTML foundations' })
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    await waitFor(() => {
+      expect(learningMocks.recordSlideProgress).toHaveBeenCalledWith(
+        topicId,
+        'upload',
+        1,
+        'test-token',
+      )
+    })
+  })
+
   it('shows the summary and quiz confirmation after the slides are complete', async () => {
     const user = userEvent.setup()
     const completedProgress = {

@@ -11,10 +11,10 @@ const { mocks } = vi.hoisted(() => {
     findStudentEnrollment: vi.fn(),
     findCourseEnrollmentPreview: vi.fn(),
     listContentForTopic: vi.fn(),
-    listContentForCourse: vi.fn(),
+    listContentPresenceForCourse: vi.fn(),
     listTopicsAndLessons: vi.fn(),
     listTopicProgressForCourse: vi.fn(),
-    listAttemptsForStudentCourse: vi.fn(),
+    listAttemptSummariesForStudentCourse: vi.fn(),
     listPublishedQuizzesForCourse: vi.fn(),
     countQuizQuestionsByQuizIds: vi.fn(),
     findLatestAttempt: vi.fn(),
@@ -80,7 +80,7 @@ vi.mock('../src/db/topicContent.js', async (importOriginal) => {
   return {
     ...actual,
     listContentForTopic: mocks.listContentForTopic,
-    listContentForCourse: mocks.listContentForCourse,
+    listContentPresenceForCourse: mocks.listContentPresenceForCourse,
   }
 })
 
@@ -88,7 +88,7 @@ vi.mock('../src/db/learning.js', () => ({
   findTopicProgress: vi.fn(),
   listTopicProgressForCourse: mocks.listTopicProgressForCourse,
   recordTopicSlideProgress: vi.fn(),
-  listAttemptsForStudentCourse: mocks.listAttemptsForStudentCourse,
+  listAttemptSummariesForStudentCourse: mocks.listAttemptSummariesForStudentCourse,
   findLatestAttempt: mocks.findLatestAttempt,
   findInProgressAttempt: vi.fn(),
   findAttemptById: vi.fn(),
@@ -255,14 +255,14 @@ describe('student topic content', () => {
     })
     mocks.findCourseEnrollmentPreview.mockResolvedValue(course)
     mocks.listTopicsAndLessons.mockResolvedValue([courseTopic])
-    mocks.listContentForCourse.mockResolvedValue([
+    mocks.listContentPresenceForCourse.mockResolvedValue([
       { topic_id: topicId, kind: 'presentation' },
       { topic_id: topicId, kind: 'slides' },
     ])
     mocks.listTopicProgressForCourse.mockResolvedValue([])
     mocks.listPublishedQuizzesForCourse.mockResolvedValue([])
     mocks.countQuizQuestionsByQuizIds.mockResolvedValue(new Map())
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([])
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([])
     mocks.findLatestAttempt.mockResolvedValue(null)
     mocks.listContentForTopic.mockResolvedValue([
       contentRow(slidesId, 'slides', 'Week 1 slides'),

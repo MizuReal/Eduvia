@@ -21,8 +21,8 @@ const { mocks } = vi.hoisted(() => {
     listStudentEnrollmentCourses: vi.fn(),
     toCourseEnrollmentList: vi.fn(),
     listTopicProgressForCourse: vi.fn(),
-    listAttemptsForStudentCourse: vi.fn(),
-    listContentForCourse: vi.fn(),
+    listAttemptSummariesForStudentCourse: vi.fn(),
+    listContentPresenceForCourse: vi.fn(),
     listPublishedQuizzesForCourse: vi.fn(),
     countQuizQuestionsByQuizIds: vi.fn(),
   }
@@ -74,7 +74,7 @@ vi.mock('../src/db/learning.js', () => ({
   findTopicProgress: vi.fn(),
   listTopicProgressForCourse: mocks.listTopicProgressForCourse,
   recordTopicSlideProgress: vi.fn(),
-  listAttemptsForStudentCourse: mocks.listAttemptsForStudentCourse,
+  listAttemptSummariesForStudentCourse: mocks.listAttemptSummariesForStudentCourse,
   findLatestAttempt: vi.fn(),
   findInProgressAttempt: vi.fn(),
   findAttemptById: vi.fn(),
@@ -90,7 +90,7 @@ vi.mock('../src/db/topicContent.js', async (importOriginal) => {
 
   return {
     ...actual,
-    listContentForCourse: mocks.listContentForCourse,
+    listContentPresenceForCourse: mocks.listContentPresenceForCourse,
   }
 })
 
@@ -193,11 +193,11 @@ describe('enrollment API', () => {
     mocks.findProfileById.mockResolvedValue(studentProfile)
     mocks.findCourseForInstructor.mockResolvedValue(course)
     mocks.listTopicsAndLessons.mockResolvedValue(topics)
-    mocks.listContentForCourse.mockResolvedValue([
+    mocks.listContentPresenceForCourse.mockResolvedValue([
       { topic_id: topics[0]?.id ?? '', kind: 'presentation' },
     ])
     mocks.listTopicProgressForCourse.mockResolvedValue([])
-    mocks.listAttemptsForStudentCourse.mockResolvedValue([])
+    mocks.listAttemptSummariesForStudentCourse.mockResolvedValue([])
     mocks.listPublishedQuizzesForCourse.mockResolvedValue([])
     mocks.countQuizQuestionsByQuizIds.mockResolvedValue(new Map())
     mocks.requestEnrollmentRecord.mockResolvedValue(pendingEnrollment)

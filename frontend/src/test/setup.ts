@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
+import { clearResponseCache } from '../services/responseCache'
 
 if (typeof HTMLDialogElement !== 'undefined') {
   if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
@@ -25,4 +26,5 @@ if (typeof HTMLDialogElement !== 'undefined') {
 
 afterEach(() => {
   cleanup()
+  clearResponseCache()
 })

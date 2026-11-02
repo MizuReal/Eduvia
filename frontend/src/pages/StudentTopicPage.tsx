@@ -48,6 +48,8 @@ type StudentTopicPageProps = {
 
 type Source = SlideSource
 
+const VISIBILITY_REFRESH_THRESHOLD_MS = 60_000
+
 function TopicSkeleton() {
   return (
     <div className="mt-xl" aria-busy="true">
@@ -140,9 +142,14 @@ function UploadedPresentationViewer({
     )
   }, [previews.length])
 
-  useEffect(() => {
-    onViewed('upload', effectiveIndex, total)
-  }, [effectiveIndex, onViewed, total])
+  const goToSlide = (nextIndex: number) => {
+    const clamped = Math.min(
+      Math.max(0, nextIndex),
+      Math.max(0, previews.length - 1),
+    )
+    setIndex(clamped)
+    onViewed('upload', clamped, total)
+  }
 
   const preview = previews[effectiveIndex]
 
@@ -213,9 +220,7 @@ function UploadedPresentationViewer({
         <SlideNavigation
           index={effectiveIndex}
           total={previews.length}
-          onChange={(nextIndex) =>
-            setIndex(Math.min(Math.max(0, nextIndex), previews.length - 1))
-          }
+          onChange={goToSlide}
         />
       )}
     </section>
@@ -243,11 +248,14 @@ function TiptapSlidesViewer({
     )
   }, [slidesList.length])
 
-  useEffect(() => {
-    if (slidesList.length > 0) {
-      onViewed('slides', effectiveIndex, slidesList.length)
-    }
-  }, [effectiveIndex, onViewed, slidesList.length])
+  const goToSlide = (nextIndex: number) => {
+    const clamped = Math.min(
+      Math.max(0, nextIndex),
+      Math.max(0, slidesList.length - 1),
+    )
+    setIndex(clamped)
+    onViewed('slides', clamped, slidesList.length)
+  }
 
   const slide = slidesList[effectiveIndex]
 
@@ -297,9 +305,7 @@ function TiptapSlidesViewer({
         <SlideNavigation
           index={effectiveIndex}
           total={slidesList.length}
-          onChange={(nextIndex) =>
-            setIndex(Math.min(Math.max(0, nextIndex), slidesList.length - 1))
-          }
+          onChange={goToSlide}
         />
       )}
     </section>
@@ -559,40 +565,66 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
     void load()
   }, [load, reloadKey])
 
-  useEffect(() => {
-    const handleFocus = () => {
-      void fetchContent()
-        .then((next) => {
-          if (next && next.topic.courseId === courseId) {
-            setContent(next)
-            setLocked(false)
-          }
-        })
-        .catch((error: unknown) => {
-          if (error instanceof ApiError && error.code === 'TOPIC_LOCKED') {
-            setContent(null)
-            setLocked(true)
-          }
+  const refreshContent = useCallback(async () => {
+    try {
+      const next = await fetchContent()
 
-          if (error instanceof ApiError && error.status === 404) {
-            setContent(null)
-            setNotFound(true)
-          }
-        })
-    }
+      if (next && next.topic.courseId === courseId) {
+        setContent(next)
+        setLocked(false)
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'TOPIC_LOCKED') {
+        setContent(null)
+        setLocked(true)
+      }
 
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
-      window.removeEventListener('focus', handleFocus)
+      if (error instanceof ApiError && error.status === 404) {
+        setContent(null)
+        setNotFound(true)
+      }
     }
   }, [courseId, fetchContent])
+
+  useEffect(() => {
+    let hiddenAt: number | null = null
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now()
+        return
+      }
+
+      if (
+        hiddenAt !== null &&
+        Date.now() - hiddenAt >= VISIBILITY_REFRESH_THRESHOLD_MS
+      ) {
+        hiddenAt = null
+        void refreshContent()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshContent])
 
   const handleViewed = useCallback(
     (source: SlideSource, index: number, total: number) => {
       setViewed({ source, index, total })
 
-      if (!topicId || !accessToken) {
+      if (!topicId || !accessToken || !content) {
+        return
+      }
+
+      const storedIndex =
+        source === 'upload'
+          ? content.progress.presentationHighestSlideIndex
+          : content.progress.slidesHighestSlideIndex
+
+      if (index <= storedIndex) {
         return
       }
 
@@ -617,7 +649,7 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
         })
         .catch(() => undefined)
     },
-    [accessToken, topicId],
+    [accessToken, content, topicId],
   )
 
   const refreshAsset = useCallback(

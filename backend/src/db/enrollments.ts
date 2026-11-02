@@ -22,6 +22,15 @@ const ENROLLMENT_COLUMNS =
 const COURSE_WITH_INSTRUCTOR_COLUMNS =
   'instructor_id, id, name, code, term, year_level, enrollment_open, enrollment_mode, created_at, updated_at'
 
+const INSTRUCTOR_USERNAME_TTL_MS = 60_000
+
+type CachedInstructorUsername = {
+  expiresAt: number
+  username: string
+}
+
+const instructorUsernameCache = new Map<string, CachedInstructorUsername>()
+
 type EnrollmentCourseRow = Pick<
   CourseRow,
   | 'instructor_id'
@@ -84,10 +93,28 @@ async function findInstructorUsernames(
     return new Map()
   }
 
+  const now = Date.now()
+  const usernames = new Map<string, string>()
+  const missingIds: string[] = []
+
+  for (const instructorId of instructorIds) {
+    const cached = instructorUsernameCache.get(instructorId)
+
+    if (cached && cached.expiresAt > now) {
+      usernames.set(instructorId, cached.username)
+    } else {
+      missingIds.push(instructorId)
+    }
+  }
+
+  if (missingIds.length === 0) {
+    return usernames
+  }
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id, username')
-    .in('id', instructorIds)
+    .in('id', missingIds)
     .is('deleted_at', null)
 
   if (error) {
@@ -99,7 +126,15 @@ async function findInstructorUsernames(
     )
   }
 
-  return new Map((data ?? []).map((row) => [row.id, row.username]))
+  for (const row of data ?? []) {
+    usernames.set(row.id, row.username)
+    instructorUsernameCache.set(row.id, {
+      expiresAt: now + INSTRUCTOR_USERNAME_TTL_MS,
+      username: row.username,
+    })
+  }
+
+  return usernames
 }
 
 function toEnrollmentCourse(row: EnrollmentCourseRow): Course {
