@@ -33,6 +33,18 @@ const optionalJwtSecret = z.preprocess(
   z.string().min(32, 'SUPABASE_JWT_SECRET must be at least 32 characters when set.').optional(),
 )
 
+const optionalTeacherRegistrationCode = z.preprocess(
+  (value) =>
+    typeof value === 'string' ? value.trim() || undefined : value,
+  z
+    .string()
+    .min(
+      16,
+      'TEACHER_REGISTRATION_CODE must be at least 16 characters when set.',
+    )
+    .optional(),
+)
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
@@ -45,6 +57,7 @@ const envSchema = z.object({
     .transform((value) => value.replace(/\/+$/, '')),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required.'),
   SUPABASE_JWT_SECRET: optionalJwtSecret,
+  TEACHER_REGISTRATION_CODE: optionalTeacherRegistrationCode,
   UPLOAD_TEMP_DIR: z.string().min(1).default(join(tmpdir(), 'eduvia-uploads')),
   DOCUMENT_MAX_BYTES: z.coerce
     .number()

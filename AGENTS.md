@@ -219,6 +219,9 @@ These are stated once, here. Every other section assumes them.
 
 ## Domain invariants
 
+- Self-registration requires a `TUPT-XX-XXXX` username with digits, first/middle/last name,
+  faculty, and role. Student accounts are open; instructor accounts require the backend-only
+  teacher registration code. Legacy usernames remain valid for sign-in.
 - Courses are `draft`, `published`, or `archived`. Only the owner or an admin may edit.
   Publishing requires at least one lesson with at least one block, and is transactional.
 - Course lifecycle status remains target behavior. Current enrollment availability is controlled

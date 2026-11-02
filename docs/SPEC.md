@@ -12,7 +12,7 @@ with an A–D answer key, publish validation, and teacher-preview grading), enro
 (invite links, approval or auto-accept, rosters, and read-only student subject pages), and the
 student learning path (slide progress, topic locking, summaries, quiz attempts, autosave,
 server grading, and pass-based unlocking), across migrations `001_profiles.sql` through
-`011_student_learning.sql`. Lesson content blocks and enrollment progress remain the target
+`013_profiles_registration.sql`. Lesson content blocks and enrollment progress remain the target
 contract — build them to this spec, not to an approximation of it.
 
 ---
@@ -93,6 +93,21 @@ POST   /api/attempts/:attemptId/submit                        ✓ student-only
 GET    /api/admin/users
 PATCH  /api/admin/users/:userId/role
 ```
+
+### Registration
+
+`POST /api/auth/register` accepts `role` (`student` or `instructor`), `firstName`, `middleName`,
+`lastName`, `username`, `password`, `faculty`, optional `teacherAccessCode`, and `tosAccepted`.
+
+- New usernames must match `TUPT-XX-XXXX`, where every `X` is a digit. Usernames are normalized
+  to lowercase for storage and sign-in. Legacy usernames such as `juan_delacruz` remain valid for
+  sign-in so existing accounts are not locked out.
+- First, middle, and last name are all required. Names allow letters, spaces, apostrophes,
+  hyphens, and periods.
+- Student registration is open. Instructor registration requires the backend-only
+  `TEACHER_REGISTRATION_CODE`; a missing or incorrect code returns `403`. The code is never
+  stored, logged, or returned.
+- The authenticated profile response now includes `firstName`, `middleName`, and `lastName`.
 
 - `POST /api/courses` accepts an optional `code`. When it is omitted, the server generates one
   from the subject name and appends `-2`, `-3`, etc. if that code is already used in the same
@@ -450,6 +465,11 @@ Every subject has one enrollment setting and at most one enrollment row per stud
 
 - `profiles.id` references `auth.users.id`; `profiles.role` is constrained to `student`,
   `instructor`, or `admin`. Only an admin may change a role.
+- `profiles.username` is lowercase. New registrations require `TUPT-XX-XXXX` with digits;
+  legacy usernames remain allowed so existing accounts can still sign in.
+- `profiles.first_name`, `middle_name`, and `last_name` store the required full name. The
+  non-blank check is `NOT VALID` so legacy rows can be backfilled; new rows must provide all
+  three names.
 - `courses` is unique on `(instructor_id, code, term, year_level)` where the course is not
   soft-deleted. Generated codes use this same scope; custom codes must satisfy it too.
 - `courses.enrollment_open` defaults to `false`; `courses.enrollment_mode` is `approval` or

@@ -74,7 +74,9 @@ export function AuthModal({
       aria-modal="true"
       aria-labelledby="auth-dialog-title"
       aria-describedby="auth-dialog-description"
-      className="m-auto max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] max-w-modal overflow-y-auto rounded-xl border border-hairline bg-surface p-0 text-ink shadow-elevated [&::backdrop]:bg-ink/40"
+      className={`m-auto max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] ${
+        isRegister ? 'max-w-card' : 'max-w-modal'
+      } overflow-y-auto rounded-xl border border-hairline bg-surface p-0 text-ink shadow-elevated [&::backdrop]:bg-ink/40`}
       onClose={onClose}
       onCancel={(event) => {
         event.preventDefault()
@@ -100,7 +102,7 @@ export function AuthModal({
                 className="mt-xxs text-body-sm text-ink-muted"
               >
                 {isRegister
-                  ? 'A username, a password, and your faculty are all we need.'
+                  ? 'Choose your role and set up your Eduvia account.'
                   : 'Use your Eduvia username and password.'}
               </p>
             </div>

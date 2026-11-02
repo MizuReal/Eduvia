@@ -5,6 +5,7 @@ import { AuthModal } from '../components/auth/AuthModal'
 import { ApiError } from '../services/apiClient'
 import { AuthError } from '../services/authErrors'
 import type { AuthMode } from '../types/auth'
+import type { UserEvent } from '@testing-library/user-event'
 
 const authMocks = vi.hoisted(() => ({
   signIn: vi.fn(),
@@ -33,6 +34,30 @@ function renderModal(mode: AuthMode) {
   }
 }
 
+async function fillStudentRegistration(
+  user: UserEvent,
+  dialog: HTMLElement,
+) {
+  await user.click(within(dialog).getByRole('radio', { name: /^Student/i }))
+  await user.type(within(dialog).getByLabelText('First name'), 'Juan')
+  await user.type(within(dialog).getByLabelText('Middle name'), 'Dela')
+  await user.type(within(dialog).getByLabelText('Last name'), 'Cruz')
+  await user.type(
+    within(dialog).getByLabelText('Username'),
+    'tupt-25-1234',
+  )
+  await user.type(
+    within(dialog).getByLabelText('Password'),
+    'Secret123!',
+  )
+  await user.selectOptions(within(dialog).getByLabelText('Faculty'), 'BSIT')
+  await user.click(
+    within(dialog).getByRole('checkbox', {
+      name: /I agree to the privacy notice/i,
+    }),
+  )
+}
+
 beforeEach(() => {
   authMocks.signIn.mockReset()
   authMocks.register.mockReset()
@@ -48,7 +73,19 @@ describe('AuthModal', () => {
     )
 
     expect(
-      within(dialog).getByText(/Use 3–20 characters/),
+      within(dialog).getByText('Choose Student or Teacher.'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText('Enter your first name.'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText('Enter your middle name.'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText('Enter your last name.'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(/Use the format TUPT-XX-XXXX/),
     ).toBeInTheDocument()
     expect(
       within(dialog).getByText(/Use 8–72 characters/),
@@ -63,15 +100,51 @@ describe('AuthModal', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('submits a valid registration and closes the modal', async () => {
+  it('submits a valid student registration and closes the modal', async () => {
     const user = userEvent.setup()
     const { dialog, onClose } = renderModal('register')
     authMocks.register.mockResolvedValue(undefined)
 
-    await user.type(within(dialog).getByLabelText('Username'), 'juan')
+    await fillStudentRegistration(user, dialog)
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Create account' }),
+    )
+
+    await waitFor(() => {
+      expect(authMocks.register).toHaveBeenCalledWith({
+        role: 'student',
+        firstName: 'Juan',
+        middleName: 'Dela',
+        lastName: 'Cruz',
+        username: 'TUPT-25-1234',
+        password: 'Secret123!',
+        faculty: 'BSIT',
+        tosAccepted: true,
+      })
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('reveals the teacher code and submits an instructor registration', async () => {
+    const user = userEvent.setup()
+    const { dialog, onClose } = renderModal('register')
+    authMocks.register.mockResolvedValue(undefined)
+
+    await user.click(within(dialog).getByRole('radio', { name: /^Teacher/i }))
+    await user.type(within(dialog).getByLabelText('First name'), 'Juana')
+    await user.type(within(dialog).getByLabelText('Middle name'), 'Dela')
+    await user.type(within(dialog).getByLabelText('Last name'), 'Cruz')
+    await user.type(
+      within(dialog).getByLabelText('Username'),
+      'TUPT-24-5678',
+    )
     await user.type(
       within(dialog).getByLabelText('Password'),
       'Secret123!',
+    )
+    await user.type(
+      within(dialog).getByLabelText('Teacher access code'),
+      'teacher-code',
     )
     await user.selectOptions(within(dialog).getByLabelText('Faculty'), 'BSIT')
     await user.click(
@@ -85,13 +158,33 @@ describe('AuthModal', () => {
 
     await waitFor(() => {
       expect(authMocks.register).toHaveBeenCalledWith({
-        username: 'juan',
+        role: 'instructor',
+        firstName: 'Juana',
+        middleName: 'Dela',
+        lastName: 'Cruz',
+        username: 'TUPT-24-5678',
         password: 'Secret123!',
         faculty: 'BSIT',
+        teacherAccessCode: 'teacher-code',
         tosAccepted: true,
       })
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides the teacher code when switching back to student', async () => {
+    const user = userEvent.setup()
+    const { dialog } = renderModal('register')
+
+    await user.click(within(dialog).getByRole('radio', { name: /^Teacher/i }))
+    expect(
+      within(dialog).getByLabelText('Teacher access code'),
+    ).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('radio', { name: /^Student/i }))
+    expect(
+      within(dialog).queryByLabelText('Teacher access code'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows a server username error on registration', async () => {
@@ -101,10 +194,42 @@ describe('AuthModal', () => {
       new ApiError('USERNAME_TAKEN', 'That username is already taken.', 409),
     )
 
-    await user.type(within(dialog).getByLabelText('Username'), 'juan')
+    await fillStudentRegistration(user, dialog)
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Create account' }),
+    )
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'That username is already taken.',
+    )
+  })
+
+  it('shows an invalid teacher code on the access-code field', async () => {
+    const user = userEvent.setup()
+    const { dialog } = renderModal('register')
+    authMocks.register.mockRejectedValue(
+      new ApiError(
+        'INVALID_TEACHER_CODE',
+        'The teacher access code is invalid.',
+        403,
+      ),
+    )
+
+    await user.click(within(dialog).getByRole('radio', { name: /^Teacher/i }))
+    await user.type(within(dialog).getByLabelText('First name'), 'Juana')
+    await user.type(within(dialog).getByLabelText('Middle name'), 'Dela')
+    await user.type(within(dialog).getByLabelText('Last name'), 'Cruz')
+    await user.type(
+      within(dialog).getByLabelText('Username'),
+      'TUPT-24-5678',
+    )
     await user.type(
       within(dialog).getByLabelText('Password'),
       'Secret123!',
+    )
+    await user.type(
+      within(dialog).getByLabelText('Teacher access code'),
+      'wrong-code',
     )
     await user.selectOptions(within(dialog).getByLabelText('Faculty'), 'BSIT')
     await user.click(
@@ -117,7 +242,7 @@ describe('AuthModal', () => {
     )
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'That username is already taken.',
+      'The teacher access code is invalid.',
     )
   })
 

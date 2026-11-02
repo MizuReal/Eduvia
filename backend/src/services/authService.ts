@@ -1,7 +1,9 @@
+import { timingSafeEqual } from 'node:crypto'
 import {
   AUTH_EMAIL_DOMAIN,
   CURRENT_TOS_VERSION,
 } from '../config/constants.js'
+import { env } from '../config/env.js'
 import { createProfile, findProfileByUsername } from '../db/profiles.js'
 import { supabaseAdmin } from '../db/supabaseAdmin.js'
 import { AppError } from '../errors/AppError.js'
@@ -12,6 +14,10 @@ export type RegisteredUser = {
   id: string
   username: string
   email: string
+  firstName: string
+  middleName: string
+  lastName: string
+  role: RegisterInput['role']
   faculty: RegisterInput['faculty']
   tosAcceptedAt: string
 }
@@ -20,7 +26,53 @@ function toAuthEmail(username: string): string {
   return `${username}@${AUTH_EMAIL_DOMAIN}`
 }
 
-export async function registerUser(input: RegisterInput): Promise<RegisteredUser> {
+function assertTeacherAccessCode(code: string | undefined): void {
+  const expected = env.TEACHER_REGISTRATION_CODE
+
+  if (!expected) {
+    throw new AppError(
+      403,
+      'TEACHER_REGISTRATION_DISABLED',
+      'Teacher registration is not available right now.',
+      [
+        {
+          path: 'teacherAccessCode',
+          message: 'Teacher registration is not available right now.',
+        },
+      ],
+    )
+  }
+
+  const providedBuffer = Buffer.from(code ?? '')
+  const expectedBuffer = Buffer.from(expected)
+  const matches =
+    providedBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(providedBuffer, expectedBuffer)
+
+  if (!matches) {
+    throw new AppError(
+      403,
+      'INVALID_TEACHER_CODE',
+      'The teacher access code is invalid.',
+      [
+        {
+          path: 'teacherAccessCode',
+          message: 'The teacher access code is invalid.',
+        },
+      ],
+    )
+  }
+}
+
+export async function registerUser(
+  input: RegisterInput,
+): Promise<RegisteredUser> {
+  // The client's role choice is only trusted for students. Instructor access
+  // is authorized by the backend-only registration code.
+  if (input.role === 'instructor') {
+    assertTeacherAccessCode(input.teacherAccessCode)
+  }
+
   const existingProfile = await findProfileByUsername(input.username)
 
   if (existingProfile) {
@@ -36,6 +88,10 @@ export async function registerUser(input: RegisterInput): Promise<RegisteredUser
     email_confirm: true,
     user_metadata: {
       username: input.username,
+      first_name: input.firstName,
+      middle_name: input.middleName,
+      last_name: input.lastName,
+      role: input.role,
       faculty: input.faculty,
       tos_version: CURRENT_TOS_VERSION,
       tos_accepted_at: tosAcceptedAt,
@@ -69,7 +125,11 @@ export async function registerUser(input: RegisterInput): Promise<RegisteredUser
     await createProfile({
       id: userId,
       username: input.username,
+      firstName: input.firstName,
+      middleName: input.middleName,
+      lastName: input.lastName,
       faculty: input.faculty,
+      role: input.role,
       tosVersion: CURRENT_TOS_VERSION,
       tosAcceptedAt,
     })
@@ -93,6 +153,10 @@ export async function registerUser(input: RegisterInput): Promise<RegisteredUser
     id: userId,
     username: input.username,
     email,
+    firstName: input.firstName,
+    middleName: input.middleName,
+    lastName: input.lastName,
+    role: input.role,
     faculty: input.faculty,
     tosAcceptedAt,
   }

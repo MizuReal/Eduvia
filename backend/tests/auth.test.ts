@@ -39,7 +39,11 @@ vi.mock('../src/db/supabaseAdmin.js', () => ({
 const app = createApp()
 
 const validRegistration = {
-  username: 'Juan_DelaCruz',
+  role: 'student',
+  firstName: 'Juan',
+  middleName: 'Dela',
+  lastName: 'Cruz',
+  username: 'TUPT-25-1234',
   password: 'Secret123!',
   faculty: 'BSIT',
   tosAccepted: true,
@@ -47,7 +51,10 @@ const validRegistration = {
 
 const userRow = {
   id: 'user-1',
-  username: 'juan_delacruz',
+  username: 'tupt-25-1234',
+  first_name: 'Juan',
+  middle_name: 'Dela',
+  last_name: 'Cruz',
   faculty: 'BSIT',
   role: 'student',
   tos_version: '1.0',
@@ -96,19 +103,27 @@ describe('POST /api/auth/register', () => {
     expect(response.body.error).toBeNull()
     expect(response.body.data).toEqual({
       id: 'user-1',
-      username: 'juan_delacruz',
-      email: 'juan_delacruz@students.eduvia.example.com',
+      username: 'tupt-25-1234',
+      email: 'tupt-25-1234@students.eduvia.example.com',
+      firstName: 'Juan',
+      middleName: 'Dela',
+      lastName: 'Cruz',
+      role: 'student',
       faculty: 'BSIT',
       tosAcceptedAt: expect.any(String),
     })
     expect(response.body.data).not.toHaveProperty('password')
     expect(createUserMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        email: 'juan_delacruz@students.eduvia.example.com',
+        email: 'tupt-25-1234@students.eduvia.example.com',
         password: 'Secret123!',
         email_confirm: true,
         user_metadata: expect.objectContaining({
-          username: 'juan_delacruz',
+          username: 'tupt-25-1234',
+          first_name: 'Juan',
+          middle_name: 'Dela',
+          last_name: 'Cruz',
+          role: 'student',
           faculty: 'BSIT',
           tos_version: '1.0',
           tos_accepted_at: expect.any(String),
@@ -118,15 +133,75 @@ describe('POST /api/auth/register', () => {
     expect(createProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'user-1',
-        username: 'juan_delacruz',
+        username: 'tupt-25-1234',
+        firstName: 'Juan',
+        middleName: 'Dela',
+        lastName: 'Cruz',
         faculty: 'BSIT',
+        role: 'student',
         tosVersion: '1.0',
         tosAcceptedAt: expect.any(String),
       }),
     )
   })
 
-  it('rejects invalid fields and extra privilege fields', async () => {
+  it('creates an instructor profile when the teacher access code matches', async () => {
+    findProfileByUsernameMock.mockResolvedValue(null)
+    createUserMock.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    createProfileMock.mockResolvedValue(undefined)
+
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        ...validRegistration,
+        role: 'instructor',
+        teacherAccessCode: 'test-teacher-code-at-least-16',
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.data.role).toBe('instructor')
+    expect(createProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'instructor' }),
+    )
+    expect(createUserMock.mock.calls[0]?.[0].user_metadata).not.toHaveProperty(
+      'teacherAccessCode',
+    )
+  })
+
+  it('rejects an incorrect teacher access code before creating the user', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        ...validRegistration,
+        role: 'instructor',
+        teacherAccessCode: 'wrong-teacher-code',
+      })
+
+    expect(response.status).toBe(403)
+    expect(response.body.error.code).toBe('INVALID_TEACHER_CODE')
+    expect(response.body.error.details).toContainEqual({
+      path: 'teacherAccessCode',
+      message: 'The teacher access code is invalid.',
+    })
+    expect(findProfileByUsernameMock).not.toHaveBeenCalled()
+    expect(createUserMock).not.toHaveBeenCalled()
+    expect(createProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('requires a teacher access code when registering as an instructor', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({ ...validRegistration, role: 'instructor' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+    expect(createUserMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed fields and extra privilege fields', async () => {
     const response = await request(app).post('/api/auth/register').send({
       username: '1bad',
       password: 'weak',
@@ -140,6 +215,16 @@ describe('POST /api/auth/register', () => {
     expect(response.body.error.details.length).toBeGreaterThan(0)
     expect(createUserMock).not.toHaveBeenCalled()
     expect(createProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects legacy-style usernames for new registrations', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({ ...validRegistration, username: 'juan_delacruz' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.code).toBe('VALIDATION_ERROR')
+    expect(createUserMock).not.toHaveBeenCalled()
   })
 
   it('returns 409 when the username already has a profile', async () => {
@@ -219,7 +304,10 @@ describe('GET /api/users/me', () => {
     expect(response.body).toEqual({
       data: {
         id: 'user-1',
-        username: 'juan_delacruz',
+        username: 'tupt-25-1234',
+        firstName: 'Juan',
+        middleName: 'Dela',
+        lastName: 'Cruz',
         role: 'student',
         faculty: 'BSIT',
       },

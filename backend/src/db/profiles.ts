@@ -7,7 +7,11 @@ import type { Faculty } from '../types/auth.js'
 export type CreateProfileInput = {
   id: string
   username: string
+  firstName: string
+  middleName: string
+  lastName: string
   faculty: Faculty
+  role: 'student' | 'instructor'
   tosVersion: string
   tosAcceptedAt: string
 }
@@ -48,8 +52,11 @@ export async function createProfile(input: CreateProfileInput): Promise<void> {
   const { error } = await supabaseAdmin.from('profiles').insert({
     id: input.id,
     username: input.username,
+    first_name: input.firstName,
+    middle_name: input.middleName,
+    last_name: input.lastName,
     faculty: input.faculty,
-    role: 'student',
+    role: input.role,
     tos_version: input.tosVersion,
     tos_accepted_at: input.tosAcceptedAt,
   })

@@ -3,9 +3,12 @@ export const CURRENT_TOS_VERSION = '1.0'
 
 export const FACULTIES = ['BSIT', 'BSEE', 'BSME'] as const
 
-export const USERNAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{2,19}$/
+export const USERNAME_PATTERN = /^TUPT-\d{2}-\d{4}$/i
 export const PASSWORD_PATTERN =
   /^(?=\S{8,72}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).+$/
+export const REGISTRATION_ROLES = ['student', 'instructor'] as const
+export const NAME_MAX_LENGTH = 100
+export const NAME_PATTERN = /^[\p{L}][\p{L}\p{M} .'-]*$/u
 
 export const COURSE_TERMS = [
   'first_trimester',

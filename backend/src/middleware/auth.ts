@@ -30,6 +30,9 @@ export async function requireAuth(
   req.user = {
     id: profile.id,
     username: profile.username,
+    firstName: profile.first_name,
+    middleName: profile.middle_name,
+    lastName: profile.last_name,
     role: profile.role,
     faculty: profile.faculty,
   }

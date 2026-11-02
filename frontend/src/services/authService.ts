@@ -7,9 +7,14 @@ import { AuthError } from './authErrors'
 import { supabase } from './supabaseClient'
 
 export type RegisterInput = {
+  role: 'student' | 'instructor'
+  firstName: string
+  middleName: string
+  lastName: string
   username: string
   password: string
   faculty: Faculty
+  teacherAccessCode?: string
   tosAccepted: true
 }
 
@@ -17,6 +22,10 @@ type RegisterResponse = {
   id: string
   username: string
   email: string
+  firstName: string
+  middleName: string
+  lastName: string
+  role: 'student' | 'instructor'
   faculty: Faculty
   tosAcceptedAt: string
 }

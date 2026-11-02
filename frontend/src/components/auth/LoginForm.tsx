@@ -92,10 +92,18 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           spellCheck={false}
           value={values.username}
           onChange={handleChange}
+          placeholder="TUPT-00-0000"
           aria-invalid={Boolean(errors.username)}
-          aria-describedby={errors.username ? 'login-username-error' : undefined}
+          aria-describedby={
+            errors.username
+              ? 'login-username-hint login-username-error'
+              : 'login-username-hint'
+          }
           className={FIELD_INPUT_CLASSES}
         />
+        <p id="login-username-hint" className="mt-xxs text-caption text-ink-muted">
+          Use your TUPT username or your existing Eduvia username.
+        </p>
         <FieldError id="login-username-error" message={errors.username} />
       </div>
 

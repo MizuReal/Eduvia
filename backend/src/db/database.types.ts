@@ -4,6 +4,9 @@ import type { CourseTerm, YearLevel } from '../types/course.js'
 export type ProfileRow = {
   id: string
   username: string
+  first_name: string
+  middle_name: string
+  last_name: string
   faculty: Faculty
   role: UserRole
   tos_version: string
@@ -16,6 +19,9 @@ export type ProfileRow = {
 export type ProfileInsert = {
   id: string
   username: string
+  first_name: string
+  middle_name: string
+  last_name: string
   faculty: Faculty
   role?: UserRole
   tos_version: string

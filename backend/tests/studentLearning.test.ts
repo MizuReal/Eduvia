@@ -99,6 +99,9 @@ const timestamp = '2026-11-02T00:00:00.000Z'
 const student = {
   id: 'student-1',
   username: 'student_one',
+  firstName: 'Student',
+  middleName: 'One',
+  lastName: 'Test',
   role: 'student' as const,
   faculty: 'BSIT' as const,
 }
