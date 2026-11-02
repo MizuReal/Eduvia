@@ -1,7 +1,8 @@
 import type { EnrollmentMode, EnrollmentStatus } from '../config/course'
 import type { Faculty } from './auth'
 import type { Course } from './course'
-import type { CourseOutline } from './courseOutline'
+
+export type { StudentSubjectWorkspace } from './learning'
 
 export type Enrollment = {
   id: string
@@ -48,8 +49,4 @@ export type CourseEnrollmentWorkspace = {
   course: EnrollmentCourse
   pending: CourseEnrollment[]
   active: CourseEnrollment[]
-}
-
-export type StudentSubjectWorkspace = CourseOutline & {
-  instructorUsername: string
 }

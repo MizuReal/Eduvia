@@ -58,8 +58,9 @@ import type {
   SlidesContentItem,
   SlidesDocument,
   StudentPresentationContentItem,
-  StudentTopicContent,
+  StudentTopicMaterials,
   TiptapDoc,
+  TiptapNode,
   TopicAsset,
   TopicContentItem,
   TopicContentSummary,
@@ -86,6 +87,44 @@ import { assertStorageQuota } from './storageQuotaService.js'
 const EMPTY_DOCUMENT: TiptapDoc = {
   type: 'doc',
   content: [{ type: 'paragraph' }],
+}
+
+const SLIDE_SUMMARY_MAX_LENGTH = 600
+const SLIDE_SUMMARY_MAX_POINTS = 6
+
+function collectNodeText(node: TiptapNode, parts: string[]): void {
+  if (typeof node.text === 'string' && node.text.trim()) {
+    parts.push(node.text.trim())
+  }
+
+  node.content?.forEach((child) => collectNodeText(child, parts))
+}
+
+function generateSlidesSummary(slides: SlidesContentItem): string {
+  const points: string[] = []
+
+  for (const slide of slides.content.slides) {
+    const parts: string[] = []
+    collectNodeText(slide.content as TiptapNode, parts)
+
+    const point = parts.join(' ').replace(/\s+/g, ' ').trim()
+
+    if (point && !points.includes(point)) {
+      points.push(point)
+    }
+
+    if (points.length >= SLIDE_SUMMARY_MAX_POINTS) {
+      break
+    }
+  }
+
+  if (points.length === 0) {
+    return `${slides.content.slides.length} ${
+      slides.content.slides.length === 1 ? 'slide' : 'slides'
+    } in this topic.`
+  }
+
+  return points.join(' · ').slice(0, SLIDE_SUMMARY_MAX_LENGTH)
 }
 
 function createEmptySlides(): SlidesDocument {
@@ -499,10 +538,10 @@ async function buildStudentPresentation(
   }
 }
 
-export async function getStudentTopicContent(
+export async function getStudentTopicMaterials(
   user: AuthenticatedUser,
   topicId: string,
-): Promise<StudentTopicContent> {
+): Promise<StudentTopicMaterials> {
   const topic = await findTopicById(topicId)
 
   if (!topic) {
@@ -539,6 +578,7 @@ export async function getStudentTopicContent(
     },
     slides,
     upload,
+    summary: upload?.summary ?? (slides ? generateSlidesSummary(slides) : ''),
   }
 }
 

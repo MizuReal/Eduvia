@@ -62,6 +62,29 @@ export async function listContentForTopic(
   return data ?? []
 }
 
+export async function listContentForCourse(
+  courseId: string,
+): Promise<TopicContentSelectRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('topic_content_items')
+    .select(CONTENT_COLUMNS)
+    .eq('course_id', courseId)
+    .is('deleted_at', null)
+    .order('topic_id', { ascending: true })
+    .order('kind', { ascending: true })
+
+  if (error) {
+    logger.error({ err: error, courseId }, 'Course content list failed')
+    throw new AppError(
+      503,
+      'CONTENT_LOAD_FAILED',
+      'We could not load this subject content. Try again.',
+    )
+  }
+
+  return data ?? []
+}
+
 export async function findContentForInstructor(
   contentId: string,
   instructorId: string,

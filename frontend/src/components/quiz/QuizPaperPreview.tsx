@@ -22,20 +22,32 @@ function buildDocxDocument(html: string): string {
 type QuizPaperPreviewProps = {
   file: QuizFile
   accessToken: string
+  signedUrl?: string
   className?: string
 }
 
 export function QuizPaperPreview({
   file,
   accessToken,
+  signedUrl,
   className,
 }: QuizPaperPreviewProps) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(file.mimeType === 'application/pdf')
+  const [url, setUrl] = useState<string | null>(signedUrl ?? null)
+  const [isLoading, setIsLoading] = useState(
+    file.mimeType === 'application/pdf' && !signedUrl,
+  )
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (file.mimeType !== 'application/pdf') {
+    if (signedUrl) {
+      setUrl(signedUrl)
+      setIsLoading(false)
+      setError(null)
+    }
+  }, [signedUrl])
+
+  useEffect(() => {
+    if (file.mimeType !== 'application/pdf' || signedUrl) {
       return
     }
 
@@ -63,7 +75,7 @@ export function QuizPaperPreview({
     return () => {
       cancelled = true
     }
-  }, [accessToken, file.id, file.mimeType])
+  }, [accessToken, file.id, file.mimeType, signedUrl])
 
   if (file.mimeType === 'application/pdf') {
     if (isLoading) {

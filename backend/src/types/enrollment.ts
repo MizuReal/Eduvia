@@ -1,6 +1,7 @@
 import type { Course } from './course.js'
-import type { CourseOutline } from './courseOutline.js'
 import type { Faculty } from './auth.js'
+
+export type { StudentSubjectWorkspace } from './learning.js'
 
 export type EnrollmentStatus = 'pending' | 'active' | 'rejected' | 'removed'
 
@@ -49,8 +50,4 @@ export type CourseEnrollmentWorkspace = {
   course: EnrollmentCourse
   pending: CourseEnrollment[]
   active: CourseEnrollment[]
-}
-
-export type StudentSubjectWorkspace = CourseOutline & {
-  instructorUsername: string
 }

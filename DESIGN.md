@@ -491,6 +491,18 @@ Product screenshots are framed in rounded `{rounded.lg}` / `{rounded.xl}` wells,
 **`presentation-source-tabs`** — Uploaded vs created slides
 - Two pill buttons above the viewer. The selected source uses `{colors.primary}` with `{colors.on-primary}` text; the other uses the utility surface. The group only appears when both an uploaded presentation and a Tiptap slide deck exist.
 
+**`topic-status-badge`** — Learning state
+- A pill with an icon and text. Passed and completed use `{colors.accent-green}`; not passed uses `{colors.accent-orange-deep}`; ready and in-progress use `{colors.primary}`; locked uses `{colors.ink-muted}` on `{colors.canvas-soft}`. State is never conveyed by colour alone.
+
+**`learning-progress-bar`** — Topic and course completion
+- A `{colors.canvas-soft}` track with a `{colors.primary}` fill, `{rounded.full}` ends, and a `{typography.caption}` label with numeric progress. Used for course completion and slide/answer progress. Animate width only when `prefers-reduced-motion` allows.
+
+**`quiz-runner`** — Student quiz attempt
+- Native questions use bordered `{colors.surface}` cards with 44px A–D radio rows. Paper quizzes place the signed PDF/DOCX preview beside the numbered answer grid. The save state is announced with `aria-live`; submit is disabled until every question is answered and always opens a confirmation dialog.
+
+**`quiz-result-panel`** — Pass and fail result
+- Passed results use a `{colors.accent-green}` trophy, a congratulatory heading, score, answer review, and prominent back-to-topic action. Failed results use the deep-orange alert treatment with the score and a retry action, but never reveal correct answers. Per-question review keeps icon and text together.
+
 ### Signature Components
 
 **`hero-band`** — Dark "night" hero

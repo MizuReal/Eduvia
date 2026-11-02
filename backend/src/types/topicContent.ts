@@ -108,7 +108,7 @@ export type StudentPresentationContentItem = Omit<
   previews: PresentationPreview[]
 }
 
-export type StudentTopicContent = {
+export type StudentTopicMaterials = {
   topic: {
     id: string
     title: string
@@ -116,6 +116,7 @@ export type StudentTopicContent = {
   }
   slides: SlidesContentItem | null
   upload: StudentPresentationContentItem | null
+  summary: string
 }
 
 export type TopicContentItem =

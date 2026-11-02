@@ -12,7 +12,7 @@ import {
   updateEnrollmentStatus,
 } from '../db/enrollments.js'
 import { findCourseForInstructor } from '../db/courses.js'
-import { listTopicsAndLessons } from '../db/courseOutline.js'
+import { getStudentSubjectWorkspace } from './studentLearningService.js'
 import { AppError } from '../errors/AppError.js'
 import type { UpdateEnrollmentSettingsInput } from '../schemas/enrollment.js'
 import type { AuthenticatedUser } from '../types/auth.js'
@@ -146,21 +146,7 @@ export async function getStudentSubject(
   user: AuthenticatedUser,
   courseId: string,
 ): Promise<StudentSubjectWorkspace> {
-  const enrollment = await findStudentEnrollment(courseId, user.id)
-
-  if (!enrollment || enrollment.status !== 'active') {
-    throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.')
-  }
-
-  const course = await findCourseEnrollmentPreview(courseId)
-
-  if (!course) {
-    throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.')
-  }
-
-  const topics = await listTopicsAndLessons(courseId)
-
-  return { ...course, topics }
+  return getStudentSubjectWorkspace(user, courseId)
 }
 
 export async function getCourseEnrollments(

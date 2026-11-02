@@ -1,5 +1,12 @@
 import { Router } from 'express'
-import { getStudentTopicContentHandler } from '../controllers/studentContentController.js'
+import {
+  getStudentAttemptHandler,
+  getStudentTopicContentHandler,
+  recordSlideProgressHandler,
+  saveStudentAttemptAnswersHandler,
+  startQuizAttemptHandler,
+  submitStudentAttemptHandler,
+} from '../controllers/studentContentController.js'
 import { requireAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/roles.js'
 
@@ -11,4 +18,30 @@ studentContentRouter.get(
   '/student/topics/:topicId/content',
   requireRole('student'),
   getStudentTopicContentHandler,
+)
+studentContentRouter.patch(
+  '/student/topics/:topicId/progress',
+  requireRole('student'),
+  recordSlideProgressHandler,
+)
+
+studentContentRouter.post(
+  '/quizzes/:quizId/attempts',
+  requireRole('student'),
+  startQuizAttemptHandler,
+)
+studentContentRouter.get(
+  '/attempts/:attemptId',
+  requireRole('student'),
+  getStudentAttemptHandler,
+)
+studentContentRouter.patch(
+  '/attempts/:attemptId/answers',
+  requireRole('student'),
+  saveStudentAttemptAnswersHandler,
+)
+studentContentRouter.post(
+  '/attempts/:attemptId/submit',
+  requireRole('student'),
+  submitStudentAttemptHandler,
 )

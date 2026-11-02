@@ -4,11 +4,14 @@ import {
   ArrowRight,
   BookOpen,
   CircleAlert,
+  Lock,
   RefreshCw,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
+import { CourseProgressBar } from '../components/student/ProgressBars'
 import { StudentAccessGate } from '../components/student/StudentAccessGate'
+import { TopicStatusBadge } from '../components/student/TopicStatusBadge'
 import { Button } from '../components/ui/Button'
 import { courseTermLabel, yearLevelLabel } from '../config/course'
 import { useAuth } from '../context/AuthContext'
@@ -72,6 +75,12 @@ function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
         </p>
       </div>
 
+      <CourseProgressBar
+        completed={subject.progress.completedTopics}
+        total={subject.progress.totalTopics}
+        percent={subject.progress.percent}
+      />
+
       <section aria-labelledby="subject-topics-heading" className="mt-xl">
         <div className="flex items-center justify-between gap-md">
           <h2 id="subject-topics-heading" className="text-heading-3">
@@ -97,17 +106,31 @@ function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
             {subject.topics.map((topic, index) => (
               <li
                 key={topic.id}
-                className="rounded-lg border border-hairline bg-surface p-lg shadow-soft"
+                className={
+                  topic.locked
+                    ? 'rounded-lg border border-hairline bg-canvas-soft p-lg'
+                    : 'rounded-lg border border-hairline bg-surface p-lg shadow-soft'
+                }
               >
                 <div className="flex items-start gap-sm">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-canvas-soft text-body-sm font-medium text-ink-secondary">
-                    {index + 1}
+                    {topic.locked ? (
+                      <Lock className="size-4" aria-hidden="true" />
+                    ) : (
+                      index + 1
+                    )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-title text-ink">{topic.title}</h3>
+                    <div className="flex flex-wrap items-center gap-xs">
+                      <h3 className="text-title text-ink">{topic.title}</h3>
+                      <TopicStatusBadge status={topic.status} />
+                    </div>
                     <p className="mt-xxs text-caption text-ink-muted">
                       {topic.lessons.length}{' '}
                       {topic.lessons.length === 1 ? 'lesson' : 'lessons'}
+                      {topic.quiz
+                        ? ` · ${topic.quiz.questionCount} quiz questions`
+                        : ''}
                     </p>
                     {topic.lessons.length > 0 && (
                       <ol className="mt-sm space-y-xs border-l border-hairline pl-sm">
@@ -118,14 +141,21 @@ function SubjectContent({ subject }: { subject: StudentSubjectWorkspace }) {
                         ))}
                       </ol>
                     )}
-                    <Link
-                      to={`/student/subjects/${subject.id}/topics/${topic.id}`}
-                      className="mt-sm inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-primary transition-colors hover:text-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                      aria-label={`Open ${topic.title}`}
-                    >
-                      Open topic
-                      <ArrowRight className="size-4" aria-hidden="true" />
-                    </Link>
+                    {topic.locked ? (
+                      <p className="mt-sm flex items-center gap-xxs text-caption text-ink-muted">
+                        <Lock className="size-3.5" aria-hidden="true" />
+                        Pass the previous topic to unlock this one.
+                      </p>
+                    ) : (
+                      <Link
+                        to={`/student/subjects/${subject.id}/topics/${topic.id}`}
+                        className="mt-sm inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-primary transition-colors hover:text-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        aria-label={`Open ${topic.title}`}
+                      >
+                        Open topic
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </li>

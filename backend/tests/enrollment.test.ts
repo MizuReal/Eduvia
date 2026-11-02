@@ -20,6 +20,11 @@ const { mocks } = vi.hoisted(() => {
     findCourseEnrollmentPreview: vi.fn(),
     listStudentEnrollmentCourses: vi.fn(),
     toCourseEnrollmentList: vi.fn(),
+    listTopicProgressForCourse: vi.fn(),
+    listAttemptsForStudentCourse: vi.fn(),
+    listContentForCourse: vi.fn(),
+    listPublishedQuizzesForCourse: vi.fn(),
+    countQuizQuestionsByQuizIds: vi.fn(),
   }
 
   return { mocks }
@@ -64,6 +69,41 @@ vi.mock('../src/db/courseOutline.js', () => ({
 }))
 
 vi.mock('../src/db/enrollments.js', () => mocks)
+
+vi.mock('../src/db/learning.js', () => ({
+  findTopicProgress: vi.fn(),
+  listTopicProgressForCourse: mocks.listTopicProgressForCourse,
+  recordTopicSlideProgress: vi.fn(),
+  listAttemptsForStudentCourse: mocks.listAttemptsForStudentCourse,
+  findLatestAttempt: vi.fn(),
+  findInProgressAttempt: vi.fn(),
+  findAttemptById: vi.fn(),
+  listAttemptAnswers: vi.fn(),
+  createQuizAttempt: vi.fn(),
+  saveAttemptAnswers: vi.fn(),
+  gradeAttempt: vi.fn(),
+}))
+
+vi.mock('../src/db/topicContent.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../src/db/topicContent.js')>()
+
+  return {
+    ...actual,
+    listContentForCourse: mocks.listContentForCourse,
+  }
+})
+
+vi.mock('../src/db/quizzes.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../src/db/quizzes.js')>()
+
+  return {
+    ...actual,
+    listPublishedQuizzesForCourse: mocks.listPublishedQuizzesForCourse,
+    countQuizQuestionsByQuizIds: mocks.countQuizQuestionsByQuizIds,
+  }
+})
 
 const app = createApp()
 
@@ -153,6 +193,13 @@ describe('enrollment API', () => {
     mocks.findProfileById.mockResolvedValue(studentProfile)
     mocks.findCourseForInstructor.mockResolvedValue(course)
     mocks.listTopicsAndLessons.mockResolvedValue(topics)
+    mocks.listContentForCourse.mockResolvedValue([
+      { topic_id: topics[0]?.id ?? '', kind: 'presentation' },
+    ])
+    mocks.listTopicProgressForCourse.mockResolvedValue([])
+    mocks.listAttemptsForStudentCourse.mockResolvedValue([])
+    mocks.listPublishedQuizzesForCourse.mockResolvedValue([])
+    mocks.countQuizQuestionsByQuizIds.mockResolvedValue(new Map())
     mocks.requestEnrollmentRecord.mockResolvedValue(pendingEnrollment)
     mocks.listEnrollmentsForStudent.mockResolvedValue([
       activeEnrollment,

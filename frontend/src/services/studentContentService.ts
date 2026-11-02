@@ -1,4 +1,4 @@
-import type { StudentTopicContent } from '../types/topicContent'
+import type { StudentTopicContent } from '../types/learning'
 import { get } from './apiClient'
 
 export function getStudentTopicContent(

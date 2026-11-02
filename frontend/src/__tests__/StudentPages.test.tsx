@@ -54,6 +54,15 @@ const studentContentMocks = vi.hoisted(() => ({
 
 vi.mock('../services/studentContentService', () => studentContentMocks)
 
+const learningMocks = vi.hoisted(() => ({
+  recordSlideProgress: vi.fn(),
+  startQuizAttempt: vi.fn(),
+  saveAttemptAnswers: vi.fn(),
+  submitAttempt: vi.fn(),
+}))
+
+vi.mock('../services/learningService', () => learningMocks)
+
 vi.mock('../components/content/TiptapRenderer', () => ({
   TiptapRenderer: ({ label }: { label: string }) => <p>{label}</p>,
 }))
@@ -94,6 +103,11 @@ const pendingEnrollment = {
 
 const subject = {
   ...course,
+  progress: {
+    completedTopics: 0,
+    totalTopics: 1,
+    percent: 0,
+  },
   topics: [
     {
       id: '33333333-3333-4333-8333-333333333333',
@@ -111,6 +125,16 @@ const subject = {
       ],
       createdAt: timestamp,
       updatedAt: timestamp,
+      status: 'not_started' as const,
+      locked: false,
+      progress: {
+        presentationHighestSlideIndex: -1,
+        slidesHighestSlideIndex: -1,
+        presentationCompleted: false,
+        slidesCompleted: false,
+        completed: false,
+      },
+      quiz: null,
     },
   ],
 }
@@ -189,6 +213,25 @@ const topicContent = {
       },
     ],
   },
+  summary: 'A presentation summary that is long enough to be valid.',
+  progress: {
+    presentationHighestSlideIndex: -1,
+    slidesHighestSlideIndex: -1,
+    presentationCompleted: false,
+    slidesCompleted: false,
+    completed: false,
+  },
+  quiz: {
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    title: 'HTML quiz',
+    mode: 'native' as const,
+    questionCount: 10,
+    passingScore: 75,
+  },
+  status: 'not_started' as const,
+  latestAttempt: null,
+  locked: false,
+  nextTopicId: null,
 }
 
 function studentAuth() {
@@ -209,7 +252,11 @@ describe('student pages', () => {
   beforeEach(() => {
     Object.values(enrollmentMocks).forEach((mock) => mock.mockReset())
     Object.values(studentContentMocks).forEach((mock) => mock.mockReset())
+    Object.values(learningMocks).forEach((mock) => mock.mockReset())
     studentAuth()
+    learningMocks.recordSlideProgress.mockImplementation(
+      async () => topicContent.progress,
+    )
     studentContentMocks.getStudentTopicContent.mockResolvedValue(topicContent)
     enrollmentMocks.getStudentDashboard.mockResolvedValue({
       active: [activeEnrollment],
@@ -339,6 +386,175 @@ describe('student pages', () => {
       screen.getByRole('button', { name: 'Created slides' }),
     )
     expect(screen.getByText('Slide 1 content')).toBeInTheDocument()
+  })
+
+  it('shows the summary and quiz confirmation after the slides are complete', async () => {
+    const user = userEvent.setup()
+    const completedProgress = {
+      ...topicContent.progress,
+      completed: true,
+    }
+    learningMocks.recordSlideProgress.mockResolvedValue(completedProgress)
+    studentContentMocks.getStudentTopicContent.mockResolvedValue({
+      ...topicContent,
+      progress: completedProgress,
+      status: 'ready' as const,
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Topic summary' }),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Take quiz' }))
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Ready to take the quiz?',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a congratulatory state for a passed topic', async () => {
+    const completedProgress = {
+      ...topicContent.progress,
+      completed: true,
+    }
+    learningMocks.recordSlideProgress.mockResolvedValue(completedProgress)
+    studentContentMocks.getStudentTopicContent.mockResolvedValue({
+      ...topicContent,
+      progress: completedProgress,
+      status: 'passed' as const,
+      latestAttempt: {
+        percentage: 90,
+        passed: true,
+        gradedAt: timestamp,
+      },
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Congratulations!' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/with 90%/)).toBeInTheDocument()
+  })
+
+  it('shows a locked topic state when direct access is denied', async () => {
+    const { ApiError } = await import('../services/apiClient')
+    studentContentMocks.getStudentTopicContent.mockRejectedValue(
+      new ApiError(
+        'TOPIC_LOCKED',
+        'Finish the previous topic to unlock this one.',
+        403,
+      ),
+    )
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Topic locked' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a not-passed topic with a retry action', async () => {
+    const completedProgress = {
+      ...topicContent.progress,
+      completed: true,
+    }
+    learningMocks.recordSlideProgress.mockResolvedValue(completedProgress)
+    studentContentMocks.getStudentTopicContent.mockResolvedValue({
+      ...topicContent,
+      progress: completedProgress,
+      status: 'not_passed' as const,
+      latestAttempt: {
+        percentage: 50,
+        passed: false,
+        gradedAt: timestamp,
+      },
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[`/student/subjects/${courseId}/topics/${topicId}`]}
+      >
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId/topics/:topicId"
+            element={<StudentTopicPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Not passed yet' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Try again' }),
+    ).toBeInTheDocument()
+  })
+
+  it('marks locked subjects and hides their open link', async () => {
+    enrollmentMocks.getStudentSubject.mockResolvedValue({
+      ...subject,
+      topics: [
+        {
+          ...subject.topics[0],
+          status: 'locked' as const,
+          locked: true,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter initialEntries={[`/student/subjects/${courseId}`]}>
+        <Routes>
+          <Route
+            path="/student/subjects/:courseId"
+            element={<StudentSubjectPage onOpenAuth={vi.fn()} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Locked')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Open HTML foundations' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows an empty state when a topic has no slides', async () => {

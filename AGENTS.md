@@ -130,8 +130,10 @@ These are stated once, here. Every other section assumes them.
   roster. Students see active subjects, a read-only topic/lesson table of contents, and each
   topic's Tiptap slides or uploaded presentation previews. Never expose docs or quizzes in this
   pass.
-- Quiz runner (deferred): autosave answers, support resume, show time remaining, confirm before
-  submitting, never reveal answers before submission.
+- Quiz runner: autosave answers, resume in-progress attempts, confirm before submitting, never
+  reveal answers before submission, and show a pass congratulation with a review after passing.
+  Failed attempts show the score and retry action but never reveal correct answers. There is no
+  timer because quizzes have no time-limit setting.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
 - Styling: Tailwind utilities composed from `DESIGN.md` tokens. No CSS modules, no CSS-in-JS.
@@ -182,6 +184,9 @@ These are stated once, here. Every other section assumes them.
 - Enrollment: every teacher action verifies course ownership; every student action derives the
   student id from the authenticated token. Enrollment mutations are idempotent and never trust a
   client-supplied status or student id.
+- Student learning: verify active enrollment and topic unlock state on every progress, content,
+  and quiz route. Attempts snapshot the quiz before answers are accepted; grading reads only the
+  snapshot. Autosave replaces the answer set transactionally, and submission is atomic.
 - Presentation previews: convert uploaded PPTX files to PDF with LibreOffice, render pages to
   WebP with Poppler and `sharp`, and store them under the file's `previews/` prefix. Enforce a
   200-slide cap, command timeouts, and temp-directory cleanup. Fail the upload without replacing
@@ -240,8 +245,15 @@ These are stated once, here. Every other section assumes them.
   ready.
 - Publishing requires 10–20 complete answers and, for document quizzes, a `ready` paper.
   Publishing increments `version`; drafts stay on version 1.
-- Teacher preview grading is server-side and never persisted. Student attempts, timers,
-  autosave, enrollment checks, manual grading, and the student runner are deferred.
+- Teacher preview grading is server-side and never persisted. Student attempts are persisted as
+  `quiz_attempts` with an immutable snapshot and `attempt_answers`; there is no timer in this
+  pass.
+- Slides finish when the student reaches the last slide of either available deck. Topics with no
+  slides count as slide-complete; topics with no published quiz complete after their slides.
+- A topic is unlocked only when the previous topic is complete. The backend re-enforces this on
+  content, progress, and quiz routes.
+- Failed quizzes may be retried; passed quizzes cannot be retaken. Passing a topic unlocks the
+  next topic immediately.
 - A subject has one enrollment setting: open or closed, with `approval` or `auto` mode. New
   subjects start closed and require approval.
 - One enrollment row exists per `(course_id, student_id)` with status `pending`, `active`,
@@ -282,12 +294,14 @@ These are stated once, here. Every other section assumes them.
   setup and shared doubles in `frontend/src/test/`. Cover role-aware routing, form validation,
   upload states, slides editing, embedded image/file rendering, quiz authoring and preview
   states, enrollment dashboard and invite flows, teacher roster actions, student topic slide
-  viewers, quiz runner timer and resume behavior, and accessibility-critical interactions.
+  viewers, topic status/locking, quiz autosave/submission/results, quiz resume behavior, and
+  accessibility-critical interactions.
 - Backend: Vitest + Supertest. Suites live in `backend/tests/*.test.ts`; env setup and fixtures in
   `backend/src/test/`. Cover auth middleware, role authorization, Zod validation, Tiptap content
   validation, embedded-file ownership, image/document validation, signed URL issuance, quiz
   authoring and preview grading, enrollment approval/auto/removal, student topic slides,
-  presentation preview conversion, attempt snapshots, and soft-delete behavior.
+  presentation preview conversion, topic progress and locking, quiz attempts and grading,
+  attempt snapshots, and soft-delete behavior.
 - Tests never touch a real Supabase project, storage, or the network. Mock
   `services/supabaseClient.ts`, `db/supabaseAdmin.ts`, storage calls, and `fetch`. Values come
   from committed `frontend/.env.test` and `backend/.env.test`; tests pass with no `.env` present.

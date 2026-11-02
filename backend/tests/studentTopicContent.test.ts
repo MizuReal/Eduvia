@@ -11,6 +11,13 @@ const { mocks } = vi.hoisted(() => {
     findStudentEnrollment: vi.fn(),
     findCourseEnrollmentPreview: vi.fn(),
     listContentForTopic: vi.fn(),
+    listContentForCourse: vi.fn(),
+    listTopicsAndLessons: vi.fn(),
+    listTopicProgressForCourse: vi.fn(),
+    listAttemptsForStudentCourse: vi.fn(),
+    listPublishedQuizzesForCourse: vi.fn(),
+    countQuizQuestionsByQuizIds: vi.fn(),
+    findLatestAttempt: vi.fn(),
     findFilesByIds: vi.fn(),
     findFileForInstructor: vi.fn(),
     createSignedUrlForCourseFile: vi.fn(),
@@ -42,7 +49,7 @@ vi.mock('../src/db/courseOutline.js', () => ({
   getNextTopicOrderIndex: vi.fn(),
   insertLesson: vi.fn(),
   insertTopic: vi.fn(),
-  listTopicsAndLessons: vi.fn(),
+  listTopicsAndLessons: mocks.listTopicsAndLessons,
   reorderCourseTopics: vi.fn(),
   reorderTopicLessons: vi.fn(),
   restoreLesson: vi.fn(),
@@ -73,6 +80,32 @@ vi.mock('../src/db/topicContent.js', async (importOriginal) => {
   return {
     ...actual,
     listContentForTopic: mocks.listContentForTopic,
+    listContentForCourse: mocks.listContentForCourse,
+  }
+})
+
+vi.mock('../src/db/learning.js', () => ({
+  findTopicProgress: vi.fn(),
+  listTopicProgressForCourse: mocks.listTopicProgressForCourse,
+  recordTopicSlideProgress: vi.fn(),
+  listAttemptsForStudentCourse: mocks.listAttemptsForStudentCourse,
+  findLatestAttempt: mocks.findLatestAttempt,
+  findInProgressAttempt: vi.fn(),
+  findAttemptById: vi.fn(),
+  listAttemptAnswers: vi.fn(),
+  createQuizAttempt: vi.fn(),
+  saveAttemptAnswers: vi.fn(),
+  gradeAttempt: vi.fn(),
+}))
+
+vi.mock('../src/db/quizzes.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../src/db/quizzes.js')>()
+
+  return {
+    ...actual,
+    listPublishedQuizzesForCourse: mocks.listPublishedQuizzesForCourse,
+    countQuizQuestionsByQuizIds: mocks.countQuizQuestionsByQuizIds,
   }
 })
 
@@ -120,6 +153,15 @@ const topic = {
   order_index: 0,
   created_at: timestamp,
   updated_at: timestamp,
+}
+
+const courseTopic = {
+  id: topicId,
+  title: 'HTML foundations',
+  orderIndex: 0,
+  lessons: [],
+  createdAt: timestamp,
+  updatedAt: timestamp,
 }
 
 const course = {
@@ -212,6 +254,16 @@ describe('student topic content', () => {
       updatedAt: timestamp,
     })
     mocks.findCourseEnrollmentPreview.mockResolvedValue(course)
+    mocks.listTopicsAndLessons.mockResolvedValue([courseTopic])
+    mocks.listContentForCourse.mockResolvedValue([
+      { topic_id: topicId, kind: 'presentation' },
+      { topic_id: topicId, kind: 'slides' },
+    ])
+    mocks.listTopicProgressForCourse.mockResolvedValue([])
+    mocks.listPublishedQuizzesForCourse.mockResolvedValue([])
+    mocks.countQuizQuestionsByQuizIds.mockResolvedValue(new Map())
+    mocks.listAttemptsForStudentCourse.mockResolvedValue([])
+    mocks.findLatestAttempt.mockResolvedValue(null)
     mocks.listContentForTopic.mockResolvedValue([
       contentRow(slidesId, 'slides', 'Week 1 slides'),
       contentRow(uploadId, 'presentation', 'Week 1 presentation'),

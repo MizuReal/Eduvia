@@ -176,6 +176,28 @@ export async function findQuizByTopic(
   return data ?? null
 }
 
+export async function listPublishedQuizzesForCourse(
+  courseId: string,
+): Promise<QuizSelectRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('quizzes')
+    .select(QUIZ_COLUMNS)
+    .eq('course_id', courseId)
+    .eq('status', 'published')
+    .is('deleted_at', null)
+
+  if (error) {
+    logger.error({ err: error, courseId }, 'Published quiz list failed')
+    throw new AppError(
+      503,
+      'QUIZ_LOAD_FAILED',
+      'We could not load this subject’s quizzes. Try again.',
+    )
+  }
+
+  return data ?? []
+}
+
 export async function insertQuiz(
   courseId: string,
   topicId: string,
@@ -228,6 +250,37 @@ export async function listQuizQuestions(
   }
 
   return data ?? []
+}
+
+export async function countQuizQuestionsByQuizIds(
+  quizIds: string[],
+): Promise<Map<string, number>> {
+  if (quizIds.length === 0) {
+    return new Map()
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('quiz_questions')
+    .select('quiz_id')
+    .in('quiz_id', quizIds)
+    .is('deleted_at', null)
+
+  if (error) {
+    logger.error({ err: error }, 'Quiz question counts failed')
+    throw new AppError(
+      503,
+      'QUIZ_LOAD_FAILED',
+      'We could not load these quizzes. Try again.',
+    )
+  }
+
+  const counts = new Map<string, number>()
+
+  for (const row of data ?? []) {
+    counts.set(row.quiz_id, (counts.get(row.quiz_id) ?? 0) + 1)
+  }
+
+  return counts
 }
 
 export async function findFileForQuiz(

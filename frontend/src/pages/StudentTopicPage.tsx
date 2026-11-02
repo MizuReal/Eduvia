@@ -1,30 +1,44 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft,
+  ArrowRight,
   BookOpen,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
   Download,
   FileText,
+  ListChecks,
+  Lock,
   Presentation,
   RefreshCw,
+  Trophy,
 } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Container } from '../components/layout/Container'
-import { StudentAccessGate } from '../components/student/StudentAccessGate'
-import { Button } from '../components/ui/Button'
+import { ConfirmDialog } from '../components/content/ConfirmDialog'
 import { TopicAssetProvider } from '../components/content/TopicAssetProvider'
 import { TiptapRenderer } from '../components/content/TiptapRenderer'
 import { openSignedUrl } from '../components/content/openSignedUrl'
+import { TopicProgressBar } from '../components/student/ProgressBars'
+import { StudentAccessGate } from '../components/student/StudentAccessGate'
+import { TopicStatusBadge } from '../components/student/TopicStatusBadge'
+import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../services/apiClient'
+import {
+  recordSlideProgress,
+} from '../services/learningService'
 import { getStudentTopicContent } from '../services/studentContentService'
 import type { AuthMode } from '../types/auth'
 import type {
+  SlideSource,
+  StudentTopicContent,
+} from '../types/learning'
+import type {
   SlidesContentItem,
   StudentPresentationContentItem,
-  StudentTopicContent,
   TopicAsset,
 } from '../types/topicContent'
 
@@ -32,7 +46,7 @@ type StudentTopicPageProps = {
   onOpenAuth: (mode: AuthMode) => void
 }
 
-type Source = 'upload' | 'slides'
+type Source = SlideSource
 
 function TopicSkeleton() {
   return (
@@ -72,18 +86,16 @@ function TopicError({
 function SlideNavigation({
   index,
   total,
-  label,
   onChange,
 }: {
   index: number
   total: number
-  label: string
   onChange: (nextIndex: number) => void
 }) {
   return (
     <div className="mt-sm flex flex-wrap items-center justify-between gap-sm">
       <p className="text-caption text-ink-muted" aria-live="polite">
-        {label} {index + 1} of {total}
+        Slide {index + 1} of {total}
       </p>
       <div className="flex items-center gap-xs">
         <Button
@@ -109,12 +121,18 @@ function SlideNavigation({
 
 function UploadedPresentationViewer({
   upload,
+  initialIndex,
+  onViewed,
 }: {
   upload: StudentPresentationContentItem
+  initialIndex: number
+  onViewed: (source: SlideSource, index: number, total: number) => void
 }) {
-  const [index, setIndex] = useState(0)
   const previews = upload.previews
+  const [index, setIndex] = useState(Math.max(0, initialIndex))
   const effectiveIndex = Math.min(index, Math.max(0, previews.length - 1))
+  const total = Math.max(1, previews.length)
+  const isPdf = upload.file.mimeType === 'application/pdf'
 
   useEffect(() => {
     setIndex((current) =>
@@ -122,8 +140,11 @@ function UploadedPresentationViewer({
     )
   }, [previews.length])
 
+  useEffect(() => {
+    onViewed('upload', effectiveIndex, total)
+  }, [effectiveIndex, onViewed, total])
+
   const preview = previews[effectiveIndex]
-  const isPdf = upload.file.mimeType === 'application/pdf'
 
   return (
     <section
@@ -192,7 +213,6 @@ function UploadedPresentationViewer({
         <SlideNavigation
           index={effectiveIndex}
           total={previews.length}
-          label="Slide"
           onChange={(nextIndex) =>
             setIndex(Math.min(Math.max(0, nextIndex), previews.length - 1))
           }
@@ -204,13 +224,17 @@ function UploadedPresentationViewer({
 
 function TiptapSlidesViewer({
   slides,
+  initialIndex,
   refreshAsset,
+  onViewed,
 }: {
   slides: SlidesContentItem
+  initialIndex: number
   refreshAsset: (fileId: string) => Promise<TopicAsset | null>
+  onViewed: (source: SlideSource, index: number, total: number) => void
 }) {
-  const [index, setIndex] = useState(0)
   const slidesList = slides.content.slides
+  const [index, setIndex] = useState(Math.max(0, initialIndex))
   const effectiveIndex = Math.min(index, Math.max(0, slidesList.length - 1))
 
   useEffect(() => {
@@ -218,6 +242,12 @@ function TiptapSlidesViewer({
       Math.min(current, Math.max(0, slidesList.length - 1)),
     )
   }, [slidesList.length])
+
+  useEffect(() => {
+    if (slidesList.length > 0) {
+      onViewed('slides', effectiveIndex, slidesList.length)
+    }
+  }, [effectiveIndex, onViewed, slidesList.length])
 
   const slide = slidesList[effectiveIndex]
 
@@ -267,12 +297,193 @@ function TiptapSlidesViewer({
         <SlideNavigation
           index={effectiveIndex}
           total={slidesList.length}
-          label="Slide"
           onChange={(nextIndex) =>
             setIndex(Math.min(Math.max(0, nextIndex), slidesList.length - 1))
           }
         />
       )}
+    </section>
+  )
+}
+
+function SummaryCard({ summary }: { summary: string }) {
+  return (
+    <section
+      aria-labelledby="topic-summary-heading"
+      className="mt-md rounded-lg border border-hairline bg-surface p-lg shadow-soft"
+    >
+      <div className="flex items-start gap-sm">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-canvas-soft">
+          <FileText className="size-5 text-ink-secondary" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 id="topic-summary-heading" className="text-title text-ink">
+            Topic summary
+          </h2>
+          <p className="mt-sm whitespace-pre-line text-body-sm text-ink-secondary">
+            {summary || 'You have reached the end of the slides.'}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function PassedCard({
+  content,
+  courseId,
+  onRetry,
+}: {
+  content: StudentTopicContent
+  courseId: string
+  onRetry: () => void
+}) {
+  return (
+    <section
+      aria-labelledby="quiz-passed-heading"
+      className="mt-md rounded-lg border border-accent-green/40 bg-canvas-soft p-lg"
+    >
+      <div className="flex items-start gap-sm">
+        <Trophy
+          className="mt-xxs size-6 shrink-0 text-accent-green"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 id="quiz-passed-heading" className="text-heading-3 text-ink">
+            Congratulations!
+          </h2>
+          <p className="mt-xxs text-body-sm text-ink-secondary">
+            You passed {content.quiz?.title ?? 'this quiz'}
+            {content.latestAttempt
+              ? ` with ${content.latestAttempt.percentage}%`
+              : ''}.
+          </p>
+          <div className="mt-md flex flex-wrap gap-xs">
+            {content.nextTopicId && (
+              <Link
+                to={`/student/subjects/${courseId}/topics/${content.nextTopicId}`}
+                className="inline-flex min-h-11 items-center gap-xxs rounded-full bg-primary px-lg py-sm text-button text-on-primary transition-colors hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                Next topic
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+            )}
+            <Button variant="utility" onClick={onRetry}>
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Reopen topic
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function NotPassedCard({
+  content,
+  onTryAgain,
+}: {
+  content: StudentTopicContent
+  onTryAgain: () => void
+}) {
+  return (
+    <section
+      aria-labelledby="quiz-failed-heading"
+      className="mt-md rounded-lg border border-accent-orange-deep/30 bg-canvas-soft p-lg"
+    >
+      <div className="flex items-start gap-sm">
+        <CircleAlert
+          className="mt-xxs size-6 shrink-0 text-accent-orange-deep"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 id="quiz-failed-heading" className="text-heading-3 text-ink">
+            Not passed yet
+          </h2>
+          <p className="mt-xxs text-body-sm text-ink-secondary">
+            You scored {content.latestAttempt?.percentage ?? 0}%. Review the
+            slides and summary, then try again.
+          </p>
+          <Button variant="primary" onClick={onTryAgain} className="mt-md">
+            <ListChecks className="size-4" aria-hidden="true" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ReadyForQuizCard({
+  content,
+  onStart,
+}: {
+  content: StudentTopicContent
+  onStart: () => void
+}) {
+  return (
+    <section
+      aria-labelledby="quiz-ready-heading"
+      className="mt-md rounded-lg border border-primary/30 bg-canvas-soft p-lg"
+    >
+      <div className="flex items-start gap-sm">
+        <ListChecks
+          className="mt-xxs size-6 shrink-0 text-primary"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 id="quiz-ready-heading" className="text-heading-3 text-ink">
+            Ready for the quiz
+          </h2>
+          <p className="mt-xxs text-body-sm text-ink-secondary">
+            {content.quiz?.title}. {content.quiz?.questionCount ?? 0} questions
+            · passing score {content.quiz?.passingScore ?? 0}%.
+          </p>
+          <Button variant="primary" onClick={onStart} className="mt-md">
+            <ListChecks className="size-4" aria-hidden="true" />
+            Take quiz
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CompletedCard({
+  content,
+  courseId,
+}: {
+  content: StudentTopicContent
+  courseId: string
+}) {
+  return (
+    <section
+      aria-labelledby="topic-completed-heading"
+      className="mt-md rounded-lg border border-accent-green/40 bg-canvas-soft p-lg"
+    >
+      <div className="flex items-start gap-sm">
+        <CheckCircle2
+          className="mt-xxs size-6 shrink-0 text-accent-green"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 id="topic-completed-heading" className="text-heading-3 text-ink">
+            Topic complete
+          </h2>
+          <p className="mt-xxs text-body-sm text-ink-secondary">
+            You finished this topic. There is no quiz for it.
+          </p>
+          {content.nextTopicId && (
+            <Link
+              to={`/student/subjects/${courseId}/topics/${content.nextTopicId}`}
+              className="mt-md inline-flex min-h-11 items-center gap-xxs rounded-full bg-primary px-lg py-sm text-button text-on-primary transition-colors hover:bg-primary-active focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Next topic
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+      </div>
     </section>
   )
 }
@@ -283,12 +494,20 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
     topicId: string
   }>()
   const { session } = useAuth()
+  const navigate = useNavigate()
   const accessToken = session?.access_token
   const [content, setContent] = useState<StudentTopicContent | null>(null)
   const [activeSource, setActiveSource] = useState<Source>('upload')
+  const [viewed, setViewed] = useState<{
+    source: Source
+    index: number
+    total: number
+  } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
+  const [locked, setLocked] = useState(false)
+  const [isQuizConfirmOpen, setIsQuizConfirmOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   const fetchContent = useCallback(async (): Promise<StudentTopicContent | null> => {
@@ -308,6 +527,7 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
     setIsLoading(true)
     setLoadError(null)
     setNotFound(false)
+    setLocked(false)
 
     try {
       const next = await fetchContent()
@@ -321,6 +541,11 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         setNotFound(true)
+        return
+      }
+
+      if (error instanceof ApiError && error.code === 'TOPIC_LOCKED') {
+        setLocked(true)
         return
       }
 
@@ -340,9 +565,15 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
         .then((next) => {
           if (next && next.topic.courseId === courseId) {
             setContent(next)
+            setLocked(false)
           }
         })
         .catch((error: unknown) => {
+          if (error instanceof ApiError && error.code === 'TOPIC_LOCKED') {
+            setContent(null)
+            setLocked(true)
+          }
+
           if (error instanceof ApiError && error.status === 404) {
             setContent(null)
             setNotFound(true)
@@ -356,6 +587,38 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
       window.removeEventListener('focus', handleFocus)
     }
   }, [courseId, fetchContent])
+
+  const handleViewed = useCallback(
+    (source: SlideSource, index: number, total: number) => {
+      setViewed({ source, index, total })
+
+      if (!topicId || !accessToken) {
+        return
+      }
+
+      void recordSlideProgress(topicId, source, index, accessToken)
+        .then((progress) => {
+          setContent((current) => {
+            if (!current) {
+              return current
+            }
+
+            const nextStatus =
+              current.status === 'passed' || current.status === 'not_passed'
+                ? current.status
+                : progress.completed
+                  ? current.quiz
+                    ? 'ready'
+                    : 'completed'
+                  : 'in_progress'
+
+            return { ...current, progress, status: nextStatus }
+          })
+        })
+        .catch(() => undefined)
+    },
+    [accessToken, topicId],
+  )
 
   const refreshAsset = useCallback(
     async (fileId: string) => {
@@ -386,12 +649,41 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
   const currentSource = sources.includes(activeSource)
     ? activeSource
     : (sources[0] ?? 'upload')
+  const currentProgress =
+    currentSource === 'upload'
+      ? content?.progress.presentationHighestSlideIndex ?? -1
+      : content?.progress.slidesHighestSlideIndex ?? -1
+  const initialIndex = Math.max(0, currentProgress)
+  const progressTotal =
+    viewed?.source === currentSource && viewed.total > 0
+      ? viewed.total
+      : currentSource === 'upload'
+        ? Math.max(1, content?.upload?.previews.length ?? 0)
+        : content?.slides?.content.slides.length ?? 0
+  const progressValue =
+    viewed?.source === currentSource
+      ? Math.min(viewed.index + 1, progressTotal)
+      : Math.min(currentProgress + 1, progressTotal)
+  const isComplete =
+    Boolean(content?.progress.completed) ||
+    content?.status === 'passed' ||
+    content?.status === 'completed'
+  const quiz = content?.quiz ?? null
+  const quizPassed = content?.status === 'passed'
+  const quizFailed = content?.status === 'not_passed'
+  const courseHref = `/student/subjects/${courseId}`
+  const quizHref = `/student/subjects/${courseId}/topics/${topicId}/quiz`
+
+  const startQuiz = () => {
+    setIsQuizConfirmOpen(false)
+    navigate(quizHref)
+  }
 
   return (
     <section className="py-xl lg:py-section">
       <Container>
         <Link
-          to={`/student/subjects/${courseId}`}
+          to={courseHref}
           className="inline-flex min-h-11 items-center gap-xxs text-body-sm font-medium text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
@@ -404,9 +696,12 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
               <span className="inline-flex items-center rounded-full bg-surface px-xs py-xxs text-eyebrow text-primary shadow-soft">
                 Topic slides
               </span>
-              <h1 className="mt-md text-heading-2 sm:text-heading-1">
-                {content.topic.title}
-              </h1>
+              <div className="mt-md flex flex-wrap items-center gap-xs">
+                <h1 className="text-heading-2 sm:text-heading-1">
+                  {content.topic.title}
+                </h1>
+                <TopicStatusBadge status={content.status} />
+              </div>
             </div>
           )}
 
@@ -432,13 +727,32 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
               </Button>
             </div>
           )}
-          {!isLoading && !notFound && loadError && (
+          {!isLoading && locked && (
+            <div className="mt-xl max-w-card rounded-lg border border-hairline bg-canvas-soft p-lg">
+              <Lock
+                className="size-5 text-ink-muted"
+                aria-hidden="true"
+              />
+              <h2 className="mt-sm text-heading-3">Topic locked</h2>
+              <p className="mt-xxs text-body-sm text-ink-muted">
+                Pass the previous topic to unlock this one.
+              </p>
+              <Link
+                to={courseHref}
+                className="mt-md inline-flex min-h-11 items-center gap-xxs rounded-full border border-hairline bg-surface px-md text-body-sm font-medium text-ink transition-colors hover:bg-canvas-soft"
+              >
+                Back to subject
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
+          )}
+          {!isLoading && !notFound && !locked && loadError && (
             <TopicError
               message={loadError}
               onRetry={() => setReloadKey((key) => key + 1)}
             />
           )}
-          {!isLoading && !notFound && !loadError && content && (
+          {!isLoading && !notFound && !locked && !loadError && content && (
             <>
               {sources.length > 1 && (
                 <div
@@ -463,6 +777,16 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
                 </div>
               )}
 
+              {progressTotal > 0 && (
+                <div className="mt-md">
+                  <TopicProgressBar
+                    value={progressValue}
+                    total={progressTotal}
+                    label="Slide progress"
+                  />
+                </div>
+              )}
+
               <div className="mt-md">
                 {sources.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-hairline bg-canvas-soft p-xl text-center">
@@ -479,17 +803,70 @@ export function StudentTopicPage({ onOpenAuth }: StudentTopicPageProps) {
                     </p>
                   </div>
                 ) : currentSource === 'upload' && content.upload ? (
-                  <UploadedPresentationViewer upload={content.upload} />
+                  <UploadedPresentationViewer
+                    upload={content.upload}
+                    initialIndex={initialIndex}
+                    onViewed={handleViewed}
+                  />
                 ) : content.slides ? (
                   <TiptapSlidesViewer
                     slides={content.slides}
+                    initialIndex={initialIndex}
                     refreshAsset={refreshAsset}
+                    onViewed={handleViewed}
                   />
                 ) : null}
               </div>
+
+              {!isComplete ? (
+                <p className="mt-md flex items-start gap-xxs rounded-md border border-hairline bg-canvas-soft p-sm text-body-sm text-ink-muted">
+                  <Lock
+                    className="mt-xxs size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  Reach the last slide to unlock the summary and quiz.
+                </p>
+              ) : (
+                <>
+                  <SummaryCard summary={content.summary} />
+
+                  {quizPassed ? (
+                    <PassedCard
+                      content={content}
+                      courseId={courseId ?? ''}
+                      onRetry={() => setReloadKey((key) => key + 1)}
+                    />
+                  ) : quizFailed ? (
+                    <NotPassedCard
+                      content={content}
+                      onTryAgain={() => setIsQuizConfirmOpen(true)}
+                    />
+                  ) : quiz ? (
+                    <ReadyForQuizCard
+                      content={content}
+                      onStart={() => setIsQuizConfirmOpen(true)}
+                    />
+                  ) : (
+                    <CompletedCard
+                      content={content}
+                      courseId={courseId ?? ''}
+                    />
+                  )}
+                </>
+              )}
             </>
           )}
         </StudentAccessGate>
+
+        {isQuizConfirmOpen && quiz && (
+          <ConfirmDialog
+            title="Ready to take the quiz?"
+            description={`${quiz.title} has ${quiz.questionCount} questions. You can retry if you do not pass.`}
+            confirmLabel={quizFailed ? 'Try again' : 'Start quiz'}
+            onConfirm={startQuiz}
+            onClose={() => setIsQuizConfirmOpen(false)}
+          />
+        )}
       </Container>
     </section>
   )

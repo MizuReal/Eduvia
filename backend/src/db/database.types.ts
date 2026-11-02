@@ -267,6 +267,88 @@ export type EnrollmentInsert = {
   removed_at?: string | null
 }
 
+export type TopicProgressRow = {
+  id: string
+  course_id: string
+  topic_id: string
+  student_id: string
+  presentation_highest_slide_index: number
+  slides_highest_slide_index: number
+  presentation_completed_at: string | null
+  slides_completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type TopicProgressInsert = {
+  id?: string
+  course_id: string
+  topic_id: string
+  student_id: string
+  presentation_highest_slide_index?: number
+  slides_highest_slide_index?: number
+  presentation_completed_at?: string | null
+  slides_completed_at?: string | null
+}
+
+export type QuizAttemptRow = {
+  id: string
+  quiz_id: string
+  course_id: string
+  topic_id: string
+  student_id: string
+  attempt_number: number
+  status: 'in_progress' | 'graded'
+  snapshot: Record<string, unknown>
+  score: number | null
+  max_score: number | null
+  percentage: number | null
+  passed: boolean | null
+  started_at: string
+  submitted_at: string | null
+  graded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type QuizAttemptInsert = {
+  id?: string
+  quiz_id: string
+  course_id: string
+  topic_id: string
+  student_id: string
+  attempt_number: number
+  status?: QuizAttemptRow['status']
+  snapshot: Record<string, unknown>
+  score?: number | null
+  max_score?: number | null
+  percentage?: number | null
+  passed?: boolean | null
+  started_at?: string
+  submitted_at?: string | null
+  graded_at?: string | null
+}
+
+export type AttemptAnswerRow = {
+  id: string
+  attempt_id: string
+  question_id: string
+  selected_option: 'A' | 'B' | 'C' | 'D'
+  is_correct: boolean | null
+  points_awarded: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type AttemptAnswerInsert = {
+  id?: string
+  attempt_id: string
+  question_id: string
+  selected_option: AttemptAnswerRow['selected_option']
+  is_correct?: boolean | null
+  points_awarded?: number | null
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -328,6 +410,24 @@ export type Database = {
         Row: EnrollmentRow
         Insert: EnrollmentInsert
         Update: Partial<EnrollmentInsert>
+        Relationships: []
+      }
+      topic_progress: {
+        Row: TopicProgressRow
+        Insert: TopicProgressInsert
+        Update: Partial<TopicProgressInsert>
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: QuizAttemptRow
+        Insert: QuizAttemptInsert
+        Update: Partial<QuizAttemptInsert>
+        Relationships: []
+      }
+      attempt_answers: {
+        Row: AttemptAnswerRow
+        Insert: AttemptAnswerInsert
+        Update: Partial<AttemptAnswerInsert>
         Relationships: []
       }
     }
@@ -438,6 +538,47 @@ export type Database = {
           target_student_id: string
         }
         Returns: EnrollmentRow
+      }
+      record_topic_slide_progress: {
+        Args: {
+          target_course_id: string
+          target_topic_id: string
+          target_student_id: string
+          target_source: 'presentation' | 'slides'
+          target_slide_index: number
+          target_slide_count: number
+        }
+        Returns: TopicProgressRow
+      }
+      create_quiz_attempt: {
+        Args: {
+          target_quiz_id: string
+          target_course_id: string
+          target_topic_id: string
+          target_student_id: string
+          target_snapshot: unknown
+        }
+        Returns: QuizAttemptRow
+      }
+      save_quiz_attempt_answers: {
+        Args: {
+          target_attempt_id: string
+          target_student_id: string
+          target_answers: unknown
+        }
+        Returns: undefined
+      }
+      grade_quiz_attempt: {
+        Args: {
+          target_attempt_id: string
+          target_student_id: string
+          target_grades: unknown
+          target_score: number
+          target_max_score: number
+          target_percentage: number
+          target_passed: boolean
+        }
+        Returns: QuizAttemptRow
       }
       update_topic_content: {
         Args: {
