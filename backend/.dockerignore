@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+tests
+src/test
+vitest.config.ts
+eslint.config.js
+.env
+.env.*
+*.log
+*.md
+.git
+.vscode
+.idea
