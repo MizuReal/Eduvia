@@ -16,6 +16,14 @@ export type CreateProfileInput = {
   tosAcceptedAt: string
 }
 
+export type StudentNameProfile = {
+  id: string
+  username: string
+  firstName: string
+  lastName: string
+  faculty: Faculty
+}
+
 export async function findProfileByUsername(
   username: string,
 ): Promise<{ id: string } | null> {
@@ -46,6 +54,42 @@ export async function findProfileById(id: string): Promise<ProfileRow | null> {
   }
 
   return data
+}
+
+export async function listStudentNamesByIds(
+  studentIds: string[],
+): Promise<Map<string, StudentNameProfile>> {
+  if (studentIds.length === 0) {
+    return new Map()
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, first_name, last_name, faculty')
+    .in('id', studentIds)
+    .is('deleted_at', null)
+
+  if (error) {
+    logger.error({ err: error }, 'Student name lookup failed')
+    throw new AppError(
+      503,
+      'PROFILE_LOOKUP_FAILED',
+      'We could not load the student list. Try again.',
+    )
+  }
+
+  return new Map(
+    (data ?? []).map((row) => [
+      row.id,
+      {
+        id: row.id,
+        username: row.username,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        faculty: row.faculty,
+      },
+    ]),
+  )
 }
 
 export async function createProfile(input: CreateProfileInput): Promise<void> {

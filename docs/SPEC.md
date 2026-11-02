@@ -377,7 +377,8 @@ student-facing response before submission.
   **active** enrolled student. Each row summarises that student's best graded attempt: score,
   maximum score, percentage, pass/fail, attempt count, and last submission. Students without a
   graded attempt remain in the list with status `not_taken`. Pending, rejected, and removed
-  students are excluded.
+  students are excluded. Rows include the student's first and last name and are sorted by last
+  name, then first name, then username; legacy profiles without names fall back to username.
 - `GET /api/courses/:courseId/students/:studentId/quiz-results` returns every published quiz in
   the subject, in topic order, with the same best-attempt summary for one student. Quizzes
   without a graded attempt show `not_taken`.

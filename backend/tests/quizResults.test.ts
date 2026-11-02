@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => {
     listTopicsAndLessons: vi.fn(),
     listEnrollmentsForCourse: vi.fn(),
     listStudentsByIds: vi.fn(),
+    listStudentNamesByIds: vi.fn(),
     findStudentEnrollment: vi.fn(),
     findQuizByTopic: vi.fn(),
     listPublishedQuizzesForCourse: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('../src/db/profiles.js', async (importOriginal) => {
   return {
     ...actual,
     findProfileById: mocks.findProfileById,
+    listStudentNamesByIds: mocks.listStudentNamesByIds,
   }
 })
 
@@ -283,6 +285,40 @@ describe('quiz results API', () => {
         ],
       ]),
     )
+    mocks.listStudentNamesByIds.mockResolvedValue(
+      new Map([
+        [
+          studentProfile.id,
+          {
+            id: studentProfile.id,
+            username: studentProfile.username,
+            firstName: 'Ana',
+            lastName: 'Zamora',
+            faculty: studentProfile.faculty,
+          },
+        ],
+        [
+          secondStudentProfile.id,
+          {
+            id: secondStudentProfile.id,
+            username: secondStudentProfile.username,
+            firstName: 'Ben',
+            lastName: 'Abad',
+            faculty: secondStudentProfile.faculty,
+          },
+        ],
+        [
+          pendingStudentProfile.id,
+          {
+            id: pendingStudentProfile.id,
+            username: pendingStudentProfile.username,
+            firstName: 'Cara',
+            lastName: 'Cruz',
+            faculty: pendingStudentProfile.faculty,
+          },
+        ],
+      ]),
+    )
     mocks.listGradedAttemptsForQuiz.mockResolvedValue([
       attempt({
         id: '88888888-8888-4888-8888-888888888888',
@@ -345,20 +381,24 @@ describe('quiz results API', () => {
     })
     expect(response.body.data.rows).toHaveLength(2)
     expect(response.body.data.rows[0]).toMatchObject({
+      username: 'student_two',
+      firstName: 'Ben',
+      lastName: 'Abad',
+      attempts: 0,
+      bestScore: null,
+      percentage: null,
+      status: 'not_taken',
+    })
+    expect(response.body.data.rows[1]).toMatchObject({
       username: 'student_one',
+      firstName: 'Ana',
+      lastName: 'Zamora',
       attempts: 2,
       bestScore: 4,
       maxScore: 5,
       percentage: 80,
       status: 'passed',
       lastSubmittedAt: laterTimestamp,
-    })
-    expect(response.body.data.rows[1]).toMatchObject({
-      username: 'student_two',
-      attempts: 0,
-      bestScore: null,
-      percentage: null,
-      status: 'not_taken',
     })
   })
 

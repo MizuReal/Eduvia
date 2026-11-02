@@ -136,8 +136,9 @@ These are stated once, here. Every other section assumes them.
   timer because quizzes have no time-limit setting.
 - Teacher quiz results: sortable datatables for a topic's full roster (every active student,
   including “Not taken”) and for one student's published quizzes across the subject. Default the
-  student view to highest percentage first. Export the current order as CSV or through the
-  browser print dialog (Save as PDF); never compute grades in the browser.
+  class view to last name and the student view to highest percentage first. Export the current
+  order as CSV or through the browser print dialog (Save as PDF); never compute grades in the
+  browser.
 - Every page that fetches data implements loading (skeleton, not a layout-shifting spinner),
   empty, error, and permission-denied states.
 - Styling: Tailwind utilities composed from `DESIGN.md` tokens. No CSS modules, no CSS-in-JS.

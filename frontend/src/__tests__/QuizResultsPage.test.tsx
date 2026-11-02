@@ -50,6 +50,8 @@ const results = {
     {
       studentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       username: 'zoe',
+      firstName: 'Zoe',
+      lastName: 'Abad',
       faculty: 'BSIT' as const,
       attempts: 2,
       bestScore: 4,
@@ -61,6 +63,8 @@ const results = {
     {
       studentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       username: 'amy',
+      firstName: 'Amy',
+      lastName: 'Zamora',
       faculty: 'BSEE' as const,
       attempts: 0,
       bestScore: null,
@@ -120,25 +124,30 @@ describe('QuizResultsPage', () => {
     expect(screen.getByText('of 2 enrolled')).toBeInTheDocument()
   })
 
-  it('sorts by username first and by score on demand', async () => {
+  it('sorts by last name first and shows the student name', async () => {
     const user = userEvent.setup()
     renderPage()
 
-    await screen.findByText('@amy')
+    await screen.findByText('Abad, Zoe')
     const bodyRows = () => screen.getAllByRole('row').slice(1)
 
     expect(
-      within(bodyRows()[0] as HTMLElement).getByText('@amy'),
+      within(bodyRows()[0] as HTMLElement).getByText('Abad, Zoe'),
     ).toBeInTheDocument()
     expect(
-      within(bodyRows()[1] as HTMLElement).getByText('@zoe'),
+      within(bodyRows()[0] as HTMLElement).getByText('@zoe'),
+    ).toBeInTheDocument()
+    expect(
+      within(bodyRows()[1] as HTMLElement).getByText('Zamora, Amy'),
     ).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Score' }))
+    await user.click(screen.getByRole('button', { name: 'Student' }))
 
     await waitFor(() => {
       expect(
-        within(screen.getAllByRole('row')[1] as HTMLElement).getByText('@zoe'),
+        within(screen.getAllByRole('row')[1] as HTMLElement).getByText(
+          'Zamora, Amy',
+        ),
       ).toBeInTheDocument()
     })
   })

@@ -28,11 +28,56 @@ import type { CsvColumn } from '../utils/tableExport'
 import type { AuthMode } from '../types/auth'
 import type { TopicQuizResultRow, TopicQuizResults } from '../types/quizResults'
 
-const DEFAULT_SORTING: SortingState = [{ id: 'username', desc: false }]
+const DEFAULT_SORTING: SortingState = [{ id: 'lastName', desc: false }]
 const EMPTY_ROWS: TopicQuizResultRow[] = []
 
 type QuizResultsPageProps = {
   onOpenAuth: (mode: AuthMode) => void
+}
+
+function compareStudentNames(
+  left: { original: TopicQuizResultRow },
+  right: { original: TopicQuizResultRow },
+): number {
+  const leftLastName =
+    left.original.lastName || left.original.firstName || left.original.username
+  const rightLastName =
+    right.original.lastName ||
+    right.original.firstName ||
+    right.original.username
+  const byLastName = leftLastName.localeCompare(rightLastName, undefined, {
+    sensitivity: 'base',
+  })
+
+  if (byLastName !== 0) {
+    return byLastName
+  }
+
+  const byFirstName = left.original.firstName.localeCompare(
+    right.original.firstName,
+    undefined,
+    { sensitivity: 'base' },
+  )
+
+  if (byFirstName !== 0) {
+    return byFirstName
+  }
+
+  return left.original.username.localeCompare(
+    right.original.username,
+    undefined,
+    { sensitivity: 'base' },
+  )
+}
+
+function studentName(row: TopicQuizResultRow): string | null {
+  if (!row.lastName) {
+    return row.firstName || null
+  }
+
+  return row.firstName
+    ? `${row.lastName}, ${row.firstName}`
+    : row.lastName
 }
 
 function formatSubmittedAt(value: string | null): string {
@@ -48,16 +93,27 @@ function formatSubmittedAt(value: string | null): string {
 
 const TOPIC_QUIZ_COLUMNS: ColumnDef<TopicQuizResultRow>[] = [
   {
-    id: 'username',
+    id: 'lastName',
     header: 'Student',
-    accessorFn: (row) => row.username.toLowerCase(),
-    cell: ({ row }) => (
-      <span className="font-medium">@{row.original.username}</span>
-    ),
-    sortingFn: (left, right) =>
-      left.original.username.localeCompare(right.original.username, undefined, {
-        sensitivity: 'base',
-      }),
+    accessorFn: (row) =>
+      (row.lastName || row.firstName || row.username).toLowerCase(),
+    cell: ({ row }) => {
+      const name = studentName(row.original)
+
+      return (
+        <div className="min-w-0">
+          <span className="block font-medium">
+            {name ?? `@${row.original.username}`}
+          </span>
+          {name && (
+            <span className="block text-caption text-ink-muted">
+              @{row.original.username}
+            </span>
+          )}
+        </div>
+      )
+    },
+    sortingFn: compareStudentNames,
   },
   {
     id: 'faculty',
@@ -102,7 +158,9 @@ const TOPIC_QUIZ_COLUMNS: ColumnDef<TopicQuizResultRow>[] = [
 ]
 
 const TOPIC_QUIZ_CSV_COLUMNS: CsvColumn<TopicQuizResultRow>[] = [
-  { header: 'Student', value: (row) => row.username },
+  { header: 'Last name', value: (row) => row.lastName },
+  { header: 'First name', value: (row) => row.firstName },
+  { header: 'Username', value: (row) => row.username },
   { header: 'Faculty', value: (row) => row.faculty },
   { header: 'Attempts', value: (row) => row.attempts },
   {
@@ -337,10 +395,10 @@ export function QuizResultsPage({ onOpenAuth }: QuizResultsPageProps) {
                     />
                   </div>
                   <p className="mt-xs max-w-card text-caption text-ink-muted print:hidden">
-                    Shows every active student and their best graded attempt.
-                    “Export CSV” opens in Excel or Google Sheets. “Print / PDF”
-                    opens your browser’s print dialog, where you can choose Save
-                    as PDF.
+                    Shows every active student and their best graded attempt,
+                    sorted by last name. “Export CSV” opens in Excel or Google
+                    Sheets. “Print / PDF” opens your browser’s print dialog,
+                    where you can choose Save as PDF.
                   </p>
 
                   <ResultsTable

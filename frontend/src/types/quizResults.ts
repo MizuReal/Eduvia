@@ -16,6 +16,8 @@ export type TopicQuizSummary = {
 export type TopicQuizResultRow = {
   studentId: string
   username: string
+  firstName: string
+  lastName: string
   faculty: Faculty
   attempts: number
   bestScore: number | null

@@ -13,6 +13,7 @@ import {
   listEnrollmentsForCourse,
   listStudentsByIds,
 } from '../db/enrollments.js'
+import { listStudentNamesByIds } from '../db/profiles.js'
 import {
   findQuizByTopic,
   listPublishedQuizzesForCourse,
@@ -109,6 +110,37 @@ function resultStatus(summary: AttemptSummary): QuizResultStatus {
   return summary.passed === true ? 'passed' : 'failed'
 }
 
+function compareStudentNames(
+  left: { username: string; firstName: string; lastName: string },
+  right: { username: string; firstName: string; lastName: string },
+): number {
+  const leftLastName =
+    left.lastName || left.firstName || left.username
+  const rightLastName =
+    right.lastName || right.firstName || right.username
+  const byLastName = leftLastName.localeCompare(rightLastName, undefined, {
+    sensitivity: 'base',
+  })
+
+  if (byLastName !== 0) {
+    return byLastName
+  }
+
+  const byFirstName = left.firstName.localeCompare(
+    right.firstName,
+    undefined,
+    { sensitivity: 'base' },
+  )
+
+  if (byFirstName !== 0) {
+    return byFirstName
+  }
+
+  return left.username.localeCompare(right.username, undefined, {
+    sensitivity: 'base',
+  })
+}
+
 function groupAttempts<TKey>(
   attempts: QuizResultAttemptRecord[],
   getKey: (attempt: QuizResultAttemptRecord) => TKey,
@@ -155,7 +187,7 @@ export async function getTopicQuizResults(
   const activeEnrollments = enrollments.filter(
     (enrollment) => enrollment.status === 'active',
   )
-  const students = await listStudentsByIds(
+  const students = await listStudentNamesByIds(
     activeEnrollments.map((enrollment) => enrollment.studentId),
   )
   const attemptsByStudent = groupAttempts(
@@ -177,17 +209,15 @@ export async function getTopicQuizResults(
         {
           studentId: student.id,
           username: student.username,
+          firstName: student.firstName,
+          lastName: student.lastName,
           faculty: student.faculty,
           ...summary,
           status: resultStatus(summary),
         },
       ]
     })
-    .sort((left, right) =>
-      left.username.localeCompare(right.username, undefined, {
-        sensitivity: 'base',
-      }),
-    )
+    .sort(compareStudentNames)
 
   return {
     topic: {
